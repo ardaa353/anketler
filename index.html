@@ -168,6 +168,8 @@
         .dust-structure-hidden { opacity: 0 !important; visibility: hidden !important; }
         #morph-canvas { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 55; pointer-events: none; display: none; }
         .dust-text-hidden { opacity: 0 !important; }
+        #questions-wrapper .question-card.active h2:not(.dust-text-hidden),#questions-wrapper .question-card.active h3:not(.dust-text-hidden){visibility:visible}
+        #form-container {min-width:0} #questions-wrapper{min-width:0;min-height:210px}
         @media (max-width: 640px) {
             #ui-layer {
                 padding: max(12px, env(safe-area-inset-top)) 0 max(12px, env(safe-area-inset-bottom));
@@ -207,9 +209,7 @@
     
     </style>
     <link rel="stylesheet" href="admin.css">
-    <script src="surveys-data.js"></script>
-    <script src="bridge-config.js"></script>
-    <script src="bridge-client.js"></script>
+    <script src="config.js"></script>
 </head>
 <body>
 
@@ -235,8 +235,8 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 13l4 4L19 7"></path>
             </svg>
             <h2 class="text-3xl md:text-4xl font-bold text-white mb-3 tracking-tight">Anket Gönderildi</h2>
-            <p class="text-gray-400 font-light text-lg">Yanıt yalnızca bu tarayıcıda saklandı. Yöneticiye otomatik gönderilmedi.</p>
-            <button id="save-answer-json" type="button" onclick="window.downloadLastLocalResponse()" style="margin-top:20px;padding:10px 16px;background:#082833;color:#91f7ff;border:1px solid #23cfe8;border-radius:10px;cursor:pointer">Yanıtımı JSON olarak indir</button>
+            <p class="text-gray-400 font-light text-lg">Yanıtınız başarıyla kaydedildi. Katılımınız için teşekkür ederiz.</p>
+
         </div>
     </div>
 
@@ -390,7 +390,7 @@
                 const rows=q.rows||[];
                 return `<div class="matrix-scroller"><table class="matrix-table"><thead><tr><th>İfade</th>${opts.map(o=>`<th>${esc(o)}</th>`).join('')}</tr></thead><tbody>${rows.map((r,j)=>`<tr><th>${esc(r)}</th>${opts.map((o,k)=>`<td><input type="${q.type==='matrix'?'radio':'checkbox'}" name="matrix-${i}-${j}" value="${esc(o)}" data-row="${esc(r)}" onchange="saveMatrix(${i})" aria-label="${esc(r)}: ${esc(o)}"></td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
             }
-            if(q.type==='file')return `<input type="file" class="premium-input" accept=".png,.jpg,.jpeg,.webp,.pdf,.txt,.docx" onchange="uploadAnswerFile(${i},this)"><small class="file-status">PNG, JPG, WEBP, PDF, TXT veya DOCX · En fazla 5 MB · Dosyanın kendisi gönderilmez!</small>`;
+            if(q.type==='file')return `<input type="file" class="premium-input" accept=".png,.jpg,.jpeg,.webp,.pdf,.txt,.docx" onchange="uploadAnswerFile(${i},this)"><small class="file-status">PNG, JPG, WEBP, PDF, TXT veya DOCX · En fazla 2 MB · R2 yükleme etkin olmalı.</small>`;
             return '<p>Desteklenmeyen soru türü.</p>';
         }
         function saveAnswer(index, value) { formAnswers[SURVEY_CONFIG.questions[index].id] = value; }
@@ -431,12 +431,15 @@
         }
         function recordRanking(index){saveAnswer(index,Array.from(document.querySelectorAll(`#rank-${index} .rank-row`)).map(e=>e.dataset.item));}
         let fileUploadPending=0;
-        function uploadAnswerFile(index,input){
+        async function uploadAnswerFile(index,input){
             const label=input.parentElement.querySelector('.file-status'),f=input.files?.[0];
             if(!f)return;
-            if(f.size>5*1024*1024){label.textContent='Dosya 5 MB sınırını aşıyor.';input.value='';return;}
-            saveAnswer(index,`${f.name} (${Math.ceil(f.size/1024)} KB) — yalnızca dosya bilgisi`);
-            label.textContent='⚠ Dosyanın içeriği kaydedilmez veya gönderilmez. Yalnızca dosya adı saklanır.';
+            if(f.size>2*1024*1024){label.textContent='En fazla 2 MB yükleyebilirsiniz.';input.value='';return;}
+            fileUploadPending++;
+            label.textContent='Dosya güvenli depoya yükleniyor…';
+            try{const record=await window.uploadSurveyFile(SURVEY_CONFIG.questions[index].id,f);saveAnswer(index,record);label.textContent='✓ Dosya yüklendi: '+f.name;}
+            catch(e){saveAnswer(index,'');label.textContent='Dosya yüklenemedi: '+e.message;input.value='';}
+            finally{fileUploadPending--;}
         }
         function validationError(){
             const q=SURVEY_CONFIG.questions[currentStep],a=formAnswers[q.id];
@@ -759,7 +762,8 @@
             let textFinished=false, structureFinished=false, finished=false;
             const revealAfterDust=()=>{
                 if(finished||!textFinished||!structureFinished)return;
-                finished=true;
+                finished=true;clearTimeout(guard);
+                headings.forEach(el=>el.classList.remove('dust-text-hidden'));
                 setStructureHidden(formContainer,hideEls,false);
                 // Controls materialize just after their dust borders converge; the question's
                 // title/body retain their original, unmodified per-character dust animation.
@@ -768,6 +772,15 @@
                     {y:0,z:0,opacity:1,scale:1,filter:'blur(0px)',duration:.43,stagger:.045,ease:'power3.out',clearProps:'transform,filter',onComplete:()=>{if(done)done();}}
                 );
             };
+            // Kurtarma koruması: yavaş cihaz/sekme değişimi animasyon callback'ini geciktirse de metin kaybolmaz.
+            const guard=setTimeout(()=>{
+                if(finished)return;
+                textDustRunId++;structureDustRunId++;
+                document.getElementById('text-dust-canvas').style.display='none';
+                document.getElementById('structure-dust-canvas').style.display='none';
+                headings.forEach(el=>el.classList.remove('dust-text-hidden'));
+                textFinished=true;structureFinished=true;revealAfterDust();
+            },reduceMotion?200:2600);
             animateTextDust(card,'in',()=>{textFinished=true;revealAfterDust();});
             runStructureDust(targets,'in',()=>{structureFinished=true;revealAfterDust();});
 
@@ -798,7 +811,7 @@
             let textFinished=false,structureFinished=false,finished=false;
             const finishExit=()=>{
                 if(finished||!textFinished||!structureFinished)return;
-                finished=true;setStructureHidden(formContainer,hideEls,false);
+                finished=true;clearTimeout(exitGuard);setStructureHidden(formContainer,hideEls,false);
                 gsap.killTweensOf([card,inputs]);card.classList.remove('active');
                 gsap.set(card,{clearProps:'all'});gsap.set(inputs,{clearProps:'all'});
                 if(done)done();
@@ -806,6 +819,13 @@
             gsap.to(inputs,{y:forward?-18:18,z:forward?35:-25,opacity:0,filter:'blur(2px)',duration:.32,ease:'power2.in'});
             gsap.to(card,{z:forward?360:-420,rotationX:forward?-4:4,rotationY:forward?-5:5,
                 scale:forward?1.055:.94,opacity:0,filter:'blur(5px)',duration:.43,ease:'power3.in'});
+            const exitGuard=setTimeout(()=>{if(finished)return;
+                textDustRunId++;structureDustRunId++;
+                card.querySelectorAll('h2,h3').forEach(el=>el.classList.remove('dust-text-hidden'));
+                document.getElementById('text-dust-canvas').style.display='none';
+                document.getElementById('structure-dust-canvas').style.display='none';
+                textFinished=true;structureFinished=true;finishExit();
+            },reduceMotion?200:1500);
             animateTextDust(card,'out',()=>{textFinished=true;finishExit();});
             runStructureDust(targets,'out',()=>{structureFinished=true;finishExit();});
         }
@@ -833,12 +853,27 @@
             const next = currentStep + direction;
             if (next < 0 || next >= totalSteps) return;
             transitionBusy = true;
+            const navFrom=currentStep;
+            // 3D/toz engine failsafe: hiçbir animasyon düğmeleri sonsuza kadar kilitlemesin.
+            const navGuard=setTimeout(()=>{
+                if(!transitionBusy || currentStep!==navFrom)return;
+                textDustRunId++;structureDustRunId++;
+                document.getElementById('text-dust-canvas').style.display='none';
+                document.getElementById('structure-dust-canvas').style.display='none';
+                document.getElementById(`q-card-${navFrom}`)?.classList.remove('active');
+                document.getElementById('form-container').classList.remove('dusting-shell');
+                currentStep=next;updateUIInfo();
+                document.getElementById(`q-card-${next}`)?.classList.add('active');
+                document.querySelectorAll('#questions-wrapper h2,#questions-wrapper h3').forEach(el=>el.classList.remove('dust-text-hidden'));
+                document.querySelectorAll('.dust-structure-hidden').forEach(el=>el.classList.remove('dust-structure-hidden'));
+                transitionBusy=false;
+            },3800);
             triggerWarpSpeed(1180, 12);
             const previous = currentStep;
             animateCardOut(previous, direction > 0 ? 'next' : 'prev', () => {
                 currentStep = next;
                 updateUIInfo();
-                animateCardIn(currentStep, () => { transitionBusy = false; });
+                animateCardIn(currentStep, () => { clearTimeout(navGuard);transitionBusy = false; });
             });
         }
         btnNext.addEventListener('click', () => changeStep(1));

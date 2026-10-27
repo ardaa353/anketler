@@ -58,3 +58,20 @@ textarea.premium-input{min-height:110px;resize:vertical}
 #save-answer-json{font-size:clamp(.75rem,2.3vw,.92rem)}
 @media(max-width:680px){.metric-row{grid-template-columns:1fr 1fr}.metric-row article:last-child{grid-column:1/-1}.chart-grid{grid-template-columns:1fr}.ad-action-strip{padding:14px}.ad-action-strip .ad-row{width:100%}.ad-action-strip button{flex:1}.ad-header .ad-brand h1{font-size:1rem}.ad-login{padding:22px}.ad-table th,.ad-table td{min-width:120px}.survey-logo{z-index:8}}
 @media(prefers-reduced-motion:reduce){#admin-dust{display:none!important}}
+
+/* GitHub Pages resilient styling: essential Tailwind utilities provided locally.
+   Keeps original visual geometry when Tailwind's remote CDN is unavailable. */
+#form-container{width:92%;max-width:672px;aspect-ratio:16/10;border-radius:2rem;padding:clamp(20px,4vw,48px);position:relative;display:flex;flex-direction:column;max-height:calc(100dvh - 30px)}
+#form-container>.absolute{position:absolute;top:0;left:0;width:100%;height:6px;background:#ffffff0d;border-radius:2rem 2rem 0 0;overflow:hidden}
+#progress-bar{height:100%;background:linear-gradient(90deg,#00e5ff,#7000ff);transition:width .7s ease}
+#questions-wrapper{position:relative;flex:1;min-height:220px;margin-top:8px}
+#form-container>.mt-auto{margin-top:auto;padding-top:24px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid #ffffff11;gap:10px}
+#btn-prev{border:0;background:transparent;color:#b5c1ce;cursor:pointer;font-weight:600;padding:8px 16px}#step-indicator{margin-left:auto;margin-right:auto;color:#8491a4;font-size:12px;font-weight:700;letter-spacing:.2em}
+.question-card h3{font-weight:800;color:#00e5ff;font-size:clamp(12px,1.5vw,14px);letter-spacing:.24em;margin:0 0 14px}
+.question-card h2{font-weight:800;font-size:clamp(25px,3vw,36px);line-height:1.2;letter-spacing:-.025em;margin:0 0 26px;color:white}
+.input-wrapper{width:100%;max-width:520px} .question-help{color:#9aafc1;margin:0 0 16px}
+#success-screen .success-card h2{font-size:clamp(25px,3.5vw,36px);font-weight:800;margin:10px 0}
+#success-screen .success-card p{color:#9aa6b7;font-size:16px}
+#success-screen .success-card svg{width:80px;height:80px;display:block;margin:0 auto 20px;color:#00e5ff}
+.survey-logo{position:absolute;right:clamp(13px,2.5vw,23px);top:17px;width:clamp(42px,5vw,62px);height:66px;object-fit:contain;z-index:7}
+@media(max-width:640px){#form-container{width:calc(100% - 24px);aspect-ratio:auto;min-height:min(76dvh,650px);max-height:none;padding:clamp(16px,4.5vw,24px);margin:12px auto;border-radius:25px}#form-container>.mt-auto{padding-top:16px}#questions-wrapper{min-height:250px}.question-card h2{font-size:clamp(23px,6.7vw,34px);margin-bottom:20px}#step-indicator{font-size:10px;letter-spacing:.1em}}
