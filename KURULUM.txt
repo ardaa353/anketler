@@ -1,0 +1,27 @@
+ULTIMATE 3D ANKET — GERÇEK GOOGLE FORMS ENTEGRASYONU
+
+DOSYALAR
+- Index.html: Mevcut 3D arayüzünün Apps Script web uygulamasında çalışacak sürümü.
+- Code.gs: Form sorularını okuyan, yanıtları Google Forms'a kaydeden ve 10 bağlantılık döngüyü yöneten sunucu kodu.
+
+ÖNEMLİ GERÇEKLER / SINIRLAR
+1) Bu sürüm yalnızca HTML olarak veya GitHub Pages'te tek başına çalışmaz. HTML ile Apps Script sunucu kodu birlikte kullanılmalıdır.
+2) Apps Script'i yayımlayan Google hesabının hedef form üzerinde düzenleyici erişimi olmalıdır. Public /d/e/.../viewform bağlantısı FormApp tarafından kabul edilmezse, form sahibinin verdiği /forms/d/FORM_ID/edit bağlantısını kullanın. Form düzenleme bağlantısı gizli tutulmalıdır.
+3) Bu özel arayüz Google'ın resmi hesap seçicisini açamaz. Arayüzdeki e-posta alanı sadece isteğe bağlı metin alanıdır; Google oturumunu doğrulamaz ve otomatik olarak forma kaydedilmez. Formun e-posta toplama ayarları Google Forms tarafında ayrıca yapılandırılmalıdır.
+4) Desteklenen soru tipleri: kısa yanıt, paragraf, çoktan seçmeli, açılır liste, onay kutuları, doğrusal ölçek, tarih ve saat. Dosya yükleme, ızgara, sıralama, puanlama ve diğer özel tipler bu özel arayüzde desteklenmez.
+5) Formun sahibi yanıt almayı kapatırsa yeni yanıt gönderimi engellenir ve site bunu bildirir. Form silinir veya paylaşım/izinler kaldırılırsa bağlantı açılırken hata bildirimi gösterilir.
+6) Son oluşturulan 10 bağlantı etkin tutulur. 11. bağlantı, ilk bağlantının token kaydını siler; 12. bağlantı ikinciyi siler. Bu kayıtlar Apps Script Script Properties içinde tutulur; dağıtımı silmek veya script özelliklerini sıfırlamak havuzu etkiler.
+7) Apps Script yanıtları form sahibinin yetkisiyle kaydeder; katılımcının Google hesabı olarak göndermez. Resmi Google hesabı seçimi ve katılımcı kimlik doğrulaması bu kurulumda yoktur.
+
+KURULUM
+1. https://script.google.com adresini açın ve Yeni proje oluşturun.
+2. Varsayılan Code.gs içeriğini Code.gs dosyasıyla değiştirin.
+3. + düğmesiyle HTML dosyası oluşturun, adını tam olarak Index yapın ve Index.html içeriğini yapıştırın.
+4. Projeyi kaydedin.
+5. Dağıt > Yeni dağıtım > Tür: Web uygulaması.
+6. Şu kişi olarak yürüt: Ben. Erişimi olanlar: Herkes (kurumunuz bu seçeneği kapatmış olabilir).
+7. Dağıt'a basıp izinleri onaylayın. Üretilen /exec adresini açın.
+8. İlk açılışta form bağlantısını girip URL OLUŞTUR'a basın. Oluşturulan token bağlantısını paylaşın.
+9. Önce test amaçlı bir formda, zorunlu sorular ve gerçek yanıt kaydıyla doğrulayın.
+
+NOT: Google Apps Script politika/hesap ayarları, form sahibi izinleri ve Google'ın FormApp davranışı ortama göre değişebilir. İlk kullanımda yetki ekranlarını onaylamak gerekir. Formun herkese açık yanıt bağlantısı ile düzenleme bağlantısı aynı şey değildir.

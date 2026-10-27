@@ -1,0 +1,1267 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ultimate 3D Pro Max Anket</title>
+
+    <!-- Tailwind CSS (Glassmorphism ve UI için) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- GSAP (Gelişmiş DOM Animasyonları) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <!-- Three.js (3D Motoru) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        /* Genel Reset ve Body */
+        *, *::before, *::after { box-sizing: border-box; }
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            overflow: hidden; background-color: #030305; color: #ffffff;
+            font-family: 'Inter', sans-serif;
+            perspective: 1500px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* 3D Arka Plan (Three.js) */
+        #bg-canvas {
+            position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh;
+            z-index: 1; pointer-events: none;
+        }
+
+        /* UI Arayüz Katmanı */
+        #ui-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; height: 100dvh;
+            z-index: 10; display: flex; align-items: center; justify-content: center;
+            pointer-events: none; /* Arkaya dokunmayı engellememek için */
+            perspective: 2000px;
+        }
+
+        /* URL oluşturucu: mevcut neon/cam tasarım diliyle uyumlu */
+        #url-setup { width: min(92%, 680px); padding: clamp(22px, 5vw, 42px); pointer-events: auto; }
+        #url-setup input { width:100%; background:rgba(0,0,0,.5); border:1px solid rgba(255,255,255,.18); padding:1rem; border-radius:1rem; color:#fff; font-size:16px; outline:none; }
+        #url-setup input:focus { border-color:#00e5ff; box-shadow:0 0 0 3px rgba(0,229,255,.12); }
+        #generated-url { overflow-wrap:anywhere; color:#00e5ff; font-size:.88rem; }
+        #setup-status { min-height:1.25rem; }
+        /* Glassmorphism Ana Kart */
+        .glass-card {
+            pointer-events: auto;
+            background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 0 40px 80px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            transform-style: preserve-3d;
+            will-change: transform, opacity;
+        }
+
+        /* Soruların Kapsayıcısı */
+        .question-card {
+            position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0;
+            display: flex; flex-direction: column; justify-content: safe center;
+            padding: clamp(8px, 1.4vh, 18px) 4px;
+            overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain;
+            scrollbar-width: thin; scrollbar-color: rgba(0,229,255,.24) transparent;
+            opacity: 0; pointer-events: none; visibility: hidden;
+            transform-style: preserve-3d; backface-visibility: hidden;
+        }
+        .question-card.active { opacity: 1; pointer-events: auto; visibility: visible; }
+
+        /* Premium Input */
+        .premium-input {
+            width: 100%; background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(255,255,255,0.15);
+            padding: 1.25rem; border-radius: 1rem; color: #fff; font-size: 1.1rem;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); outline: none;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+        }
+        .premium-input:focus {
+            border-color: #00e5ff; background: rgba(0, 0, 0, 0.7);
+            box-shadow: 0 0 25px rgba(0, 229, 255, 0.2), inset 0 2px 4px rgba(0,0,0,0.5);
+            transform: translateZ(20px);
+        }
+
+        /* Premium Radio */
+        .premium-radio-label {
+            display: flex; align-items: center; padding: 1.25rem; margin-bottom: 0.75rem;
+            background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 1rem; cursor: pointer; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            transform-style: preserve-3d;
+        }
+        .premium-radio-input { position: absolute; opacity: 0; width: 1px; height: 1px; overflow: hidden; }
+        .premium-radio-input:focus-visible + .premium-radio-label { outline: 2px solid #00e5ff; outline-offset: 3px; }
+        .premium-radio-label span { min-width: 0; overflow-wrap: anywhere; }
+        .premium-radio-input:checked + .premium-radio-label {
+            background: linear-gradient(90deg, rgba(0,229,255,0.1), rgba(112,0,255,0.1));
+            border-color: #00e5ff;
+            box-shadow: 0 10px 20px rgba(0, 229, 255, 0.15); 
+            transform: translateZ(20px) scale(1.02);
+        }
+
+        /* Premium Buton */
+        .premium-btn {
+            position: relative; overflow: hidden;
+            background: linear-gradient(135deg, #00e5ff 0%, #7000ff 100%);
+            border: none; border-radius: 999px; padding: 0.875rem 2.5rem;
+            color: #fff; font-weight: 700; letter-spacing: 0.05em; cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(112, 0, 255, 0.4);
+            transform-style: preserve-3d;
+        }
+        .premium-btn:hover {
+            transform: translateY(-2px) translateZ(30px);
+            box-shadow: 0 15px 40px rgba(0, 229, 255, 0.6);
+        }
+
+        /* Toz Bulutu Harfleri */
+        .dust-char { display: inline-block; will-change: transform, opacity; }
+        
+        /* Ekranı Yırtan "GÖNDERİLİYOR" Yazısı */
+        #epic-submit-text {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 8vw; font-weight: 900; text-align: center; letter-spacing: -0.02em;
+            background: linear-gradient(to bottom, #ffffff, #00e5ff);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 40px rgba(0,229,255,0.5);
+            pointer-events: none; opacity: 0; z-index: 50; display: none;
+            white-space: nowrap; transform-style: preserve-3d; transform-origin: 50% 50%;
+            backface-visibility: hidden; will-change: transform, opacity, filter;
+        }
+
+        /* Gönderim anındaki renk kırılması, ışık darbesi ve şok halkası */
+        #epic-submit-text.epic-impact {
+            background: linear-gradient(105deg, #fffbe8 0%, #ff55d9 35%, #00e5ff 68%, #ffffff 100%);
+            background-size: 220% 220%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            -webkit-text-stroke: 1px rgba(255,255,255,.58);
+            text-shadow: 0 0 24px rgba(255,255,255,.8), 0 0 58px rgba(255,65,210,.85), 0 0 100px rgba(0,229,255,.72);
+            filter: saturate(1.65) brightness(1.2);
+            font-weight: 1000;
+        }
+        #impact-flash {
+            position: fixed; inset: 0; z-index: 48; pointer-events: none; opacity: 0;
+            background: radial-gradient(circle at center, rgba(255,255,255,.94) 0%, rgba(0,229,255,.32) 9%, rgba(150,55,255,.15) 25%, transparent 62%);
+            mix-blend-mode: screen;
+        }
+        #impact-ring {
+            position: fixed; top: 50%; left: 50%; width: 16vmin; height: 16vmin;
+            border: 2px solid rgba(210,250,255,.95); border-radius: 50%;
+            box-shadow: 0 0 26px rgba(0,229,255,.9), inset 0 0 22px rgba(160,100,255,.45);
+            opacity: 0; z-index: 49; pointer-events: none; transform: translate(-50%, -50%) scale(.12);
+            will-change: transform, opacity;
+        }
+
+        /* Minimalist Başarı Ekranı (21st.dev Style) */
+        #success-screen {
+            position: absolute; inset: 0; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; opacity: 0; pointer-events: none;
+            z-index: 40;
+        }
+        .success-card {
+            background: rgba(10, 10, 12, 0.8); backdrop-filter: blur(30px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 2rem; padding: 4rem; text-align: center;
+            box-shadow: 0 30px 60px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.1);
+        }
+
+        /* Mobilde orijinal görünümü koruyup içerik taşmasını engelle */
+        #structure-dust-canvas { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 23; pointer-events: none; display: none; }
+        #text-dust-canvas { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 25; pointer-events: none; display: none; }
+        #form-container.dusting-shell { background: transparent !important; border-color: transparent !important; box-shadow: none !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+        .dust-structure-hidden { opacity: 0 !important; visibility: hidden !important; }
+        #morph-canvas { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 55; pointer-events: none; display: none; }
+        .dust-text-hidden { opacity: 0 !important; }
+        @media (max-width: 640px) {
+            #ui-layer {
+                padding: max(12px, env(safe-area-inset-top)) 0 max(12px, env(safe-area-inset-bottom));
+                overflow-y: auto; overflow-x: hidden; align-items: center; height: 100vh; height: 100dvh;
+                overscroll-behavior-y: contain;
+            }
+            #form-container {
+                width: calc(100% - 24px); max-width: 560px; flex-shrink: 0;
+                aspect-ratio: auto !important; min-height: min(76vh, 650px); min-height: min(76dvh, 650px);
+                max-height: none; padding: clamp(16px, 4.5vw, 24px); margin: 12px auto;
+                border-radius: clamp(22px, 7vw, 32px);
+            }
+            #questions-wrapper { min-height: 250px; min-width: 0; }
+            .question-card { padding: 8px 2px 14px; gap: 0; }
+            .question-card h3 { font-size: clamp(.7rem, 2.8vw, .875rem); line-height: 1.5; overflow-wrap: anywhere; letter-spacing: .22em; }
+            .question-card h2 { font-size: clamp(1.45rem, 6.7vw, 2.15rem); margin-bottom: clamp(1rem, 5vw, 1.5rem); line-height: 1.15; overflow-wrap: anywhere; }
+            .input-wrapper { width: 100%; min-width: 0; }
+            .premium-input { font-size: 16px; padding: 1rem; min-height: 54px; }
+            .premium-radio-label { padding: 1rem; min-height: 58px; }
+            #form-container > .mt-auto { padding-top: 1rem; column-gap: 8px; }
+            #step-indicator { font-size: .65rem; letter-spacing: .1em; text-align: center; }
+            .premium-btn { padding: .82rem 1.35rem; font-size: .8rem; min-height: 46px; }
+            #epic-submit-text { white-space: normal; width: 94%; font-size: clamp(2rem, 10vw, 4rem); line-height: 1.05; }
+            #impact-ring { width: 22vmin; height: 22vmin; }
+            .success-card { width: calc(100vw - 32px); padding: 2rem 1.25rem; border-radius: 1.5rem; }
+            .success-card h2 { font-size: clamp(1.55rem, 6.8vw, 2rem); line-height: 1.15; }
+            .success-card p { font-size: clamp(.9rem, 3.8vw, 1.125rem); }
+        }
+        @media (max-height: 700px) and (min-width: 641px) {
+            #ui-layer { overflow-y: auto; padding: 18px 0; }
+            #form-container { aspect-ratio: auto !important; min-height: 440px; margin: 12px 0; }
+            .question-card { overflow-y: auto; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .orbit, .live-dot { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Three.js Arka Planı -->
+    <canvas id="bg-canvas"></canvas>
+
+    <!-- Epik Gönderim Yazısı ve çarpma anındaki ışık efektleri -->
+    <div id="epic-submit-text">GÖNDERİLİYOR</div>
+    <div id="impact-flash" aria-hidden="true"></div>
+    <div id="impact-ring" aria-hidden="true"></div>
+
+    <!-- Anket kartı, kontroller ve soru yapısı için mikro-toz parçacıkları -->
+    <canvas id="structure-dust-canvas" aria-hidden="true"></canvas>
+    <!-- Soru yazıları için mevcut mikro-toz parçacıkları (animasyon korunur) -->
+    <canvas id="text-dust-canvas" aria-hidden="true"></canvas>
+    <!-- Gönderim patlaması ve başarı ekranına birleşen parçacıklar -->
+    <canvas id="morph-canvas" aria-hidden="true"></canvas>
+
+    <!-- Başarı Ekranı (Minimal Glass) -->
+    <div id="success-screen">
+        <div class="success-card">
+            <svg class="w-20 h-20 mx-auto text-[#00e5ff] mb-6 drop-shadow-[0_0_15px_rgba(0,229,255,0.5)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 13l4 4L19 7"></path>
+            </svg>
+            <h2 class="text-3xl md:text-4xl font-bold text-white mb-3 tracking-tight" id="success-title">Yanıt gönderildi</h2>
+            <p class="text-gray-400 font-light text-lg" id="success-message">Yanıtınız Google Forms'a iletildi.</p>
+        </div>
+    </div>
+
+    <!-- UI Katmanı -->
+    <div id="ui-layer">
+        <section id="url-setup" class="glass-card rounded-[2rem]" aria-labelledby="setup-title">
+            <p class="text-xs text-[#00e5ff] uppercase tracking-[0.3em] font-bold mb-4">ULTIMATE 3D · BAĞLANTI OLUŞTURUCU</p>
+            <h1 id="setup-title" class="text-3xl md:text-4xl font-black tracking-tight mb-4">Anket bağlantını hazırla</h1>
+            <p class="text-gray-300 mb-6 leading-relaxed">Google Forms bağlantısını girerek bu tasarımın açılacağı bir paylaşım URL'si oluşturabilirsin.</p>
+            <label for="google-form-url" class="block text-sm text-gray-300 mb-2">Google Forms bağlantısı</label>
+            <input id="google-form-url" type="url" inputmode="url" placeholder="https://docs.google.com/forms/d/e/.../viewform" autocomplete="url" />
+            <button id="create-url-btn" type="button" class="premium-btn mt-4 w-full">URL OLUŞTUR</button>
+            <div id="setup-status" class="text-sm text-gray-300 mt-4" role="status" aria-live="polite"></div>
+            <div id="generated-url-wrap" class="hidden mt-3">
+                <p class="text-xs text-gray-400 mb-2">Oluşturulan paylaşım bağlantısı</p>
+                <p id="generated-url" class="mb-4"></p>
+                <div class="flex flex-wrap gap-3">
+                    <button id="copy-url-btn" type="button" class="premium-btn">BAĞLANTIYI KOPYALA</button>
+                    <button id="preview-url-btn" type="button" class="premium-btn">ÖNİZLEMEYİ AÇ</button>
+                </div>
+            </div>
+            <div class="mt-6 border-t border-white/10 pt-4 text-xs text-gray-400 leading-relaxed">
+                Gerçek senkronizasyon için bu sayfa Google Apps Script web uygulaması olarak yayımlanmalıdır. Google hesabı alanı resmi Google hesap seçicisi değildir; e-posta bildirimi içindir.
+            </div>
+        </section>
+        <div id="account-strip" class="hidden w-[92%] max-w-2xl mb-3 rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm text-gray-300">Katılımcı e-postası (isteğe bağlı; Google hesabı doğrulaması değildir): <input id="respondent-email" type="email" placeholder="E-posta (isteğe bağlı; Google hesap seçici değildir)" class="premium-input mt-2" style="min-height:42px;padding:.6rem 1rem" /></div>
+        <div id="form-container" class="glass-card w-[92%] max-w-2xl aspect-[4/3] sm:aspect-[16/10] rounded-[2rem] p-8 md:p-12 relative flex flex-col">
+            
+            <!-- İlerleme Çubuğu -->
+            <div class="absolute top-0 left-0 w-full h-1.5 bg-white/5 rounded-t-[2rem] overflow-hidden">
+                <div id="progress-bar" class="h-full bg-gradient-to-r from-[#00e5ff] to-[#7000ff] w-0 transition-all duration-700 ease-out shadow-[0_0_15px_#00e5ff]"></div>
+            </div>
+
+            <div id="questions-wrapper" class="relative flex-grow mt-2">
+                <!-- JS ile Doldurulacak -->
+            </div>
+
+            <!-- Alt Kontroller -->
+            <div class="mt-auto pt-6 flex justify-between items-center border-t border-white/5">
+                <button id="btn-prev" class="text-gray-400 hover:text-white transition-colors px-4 py-2 font-medium tracking-wide hidden disabled:opacity-50">
+                    Geri
+                </button>
+                <div id="step-indicator" class="text-xs text-gray-500 font-bold tracking-[0.2em] uppercase mx-auto">
+                    1 / 5
+                </div>
+                <button id="btn-next" class="premium-btn">
+                    İleri
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /** =========================================
+         *  1. AYARLAR & GOOGLE FORMS
+         *  ========================================= */
+        const params = new URLSearchParams(window.location.search);
+        const sharedToken = params.get('token');
+        const setupPanel = document.getElementById('url-setup');
+        const surveyContainer = document.getElementById('form-container');
+        const accountStrip = document.getElementById('account-strip');
+        setupPanel.style.display = sharedToken ? 'none' : 'block';
+        surveyContainer.style.display = sharedToken ? 'flex' : 'none';
+        accountStrip.classList.toggle('hidden', !sharedToken);
+
+        const SURVEY_CONFIG = { formUrl: '', token: sharedToken || '', questions: [] };
+        let currentStep = 0;
+        let totalSteps = 0;
+        const formAnswers = {};
+
+        // Metni harflere bölme (Dust efekti için)
+        function escapeHTML(value) {
+            return String(value).replace(/[&<>\"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[ch]));
+        }
+        function splitTextIntoSpans(text) {
+            return Array.from(String(text)).map(char => {
+                return char === ' ' ? '<span class="dust-char">&nbsp;</span>' : `<span class="dust-char">${escapeHTML(char)}</span>`;
+            }).join('');
+        }
+
+        /** =========================================
+         *  2. DOM OLUŞTURMA
+         *  ========================================= */
+        const questionsWrapper = document.getElementById('questions-wrapper');
+        
+        function buildForm() {
+            questionsWrapper.innerHTML = '';
+            SURVEY_CONFIG.questions.forEach((q, index) => {
+                const card = document.createElement('div');
+                card.className = `question-card ${index === 0 ? 'active' : ''}`;
+                card.id = `q-card-${index}`;
+                let htmlContent = `<h3 class="text-xs md:text-sm text-[#00e5ff] uppercase tracking-[0.3em] mb-4 font-bold">${splitTextIntoSpans(q.title || 'SORU')}</h3><h2 class="text-3xl md:text-4xl font-bold mb-10 leading-tight tracking-tight">${splitTextIntoSpans(q.text || '')}</h2><div class="input-wrapper w-full max-w-lg">`;
+                const name = `answer-${index}`;
+                if (['text','paragraph'].includes(q.type)) {
+                    const tag = q.type === 'paragraph' ? 'textarea' : 'input';
+                    htmlContent += tag === 'input' ? `<input type="text" class="premium-input" placeholder="Yanıtınızı buraya yazın..." oninput="saveAnswer(${index}, this.value)" autocomplete="off">` : `<textarea class="premium-input" rows="4" placeholder="Yanıtınızı buraya yazın..." oninput="saveAnswer(${index}, this.value)"></textarea>`;
+                } else if (['radio','select'].includes(q.type)) {
+                    (q.options || []).forEach((opt, oi) => { const rid=`radio-${index}-${oi}`; htmlContent += `<div><input type="radio" id="${rid}" name="${name}" class="premium-radio-input" value="${escapeHTML(opt)}" onchange="saveAnswer(${index}, this.value)"><label for="${rid}" class="premium-radio-label"><div class="w-5 h-5 rounded-full border border-gray-500 mr-4 flex items-center justify-center transition-colors"><div class="w-2.5 h-2.5 rounded-full bg-[#00e5ff] scale-0 transition-transform duration-300"></div></div><span class="text-lg font-medium">${escapeHTML(opt)}</span></label></div>`; });
+                } else if (q.type === 'checkbox') {
+                    (q.options || []).forEach((opt, oi) => { const rid=`check-${index}-${oi}`; htmlContent += `<label class="premium-radio-label"><input type="checkbox" id="${rid}" value="${escapeHTML(opt)}" onchange="saveCheckboxAnswer(${index})" class="mr-3"><span class="text-lg font-medium">${escapeHTML(opt)}</span></label>`; });
+                } else if (q.type === 'scale') {
+                    htmlContent += `<div class="flex flex-wrap gap-3">`; for(let n=q.lower;n<=q.upper;n++) htmlContent += `<label class="premium-radio-label"><input type="radio" name="${name}" value="${n}" onchange="saveAnswer(${index}, this.value)" class="mr-2">${n}</label>`; htmlContent += `</div>`;
+                } else if (q.type === 'date' || q.type === 'time') {
+                    htmlContent += `<input type="${q.type}" class="premium-input" onchange="saveAnswer(${index}, this.value)">`;
+                } else {
+                    htmlContent += `<p class="text-gray-300">Bu soru türü özel arayüzde desteklenmiyor. Lütfen form sahibinden soruyu standart metin/çoktan seçmeli biçime çevirmesini isteyin.</p><input type="text" class="premium-input" placeholder="Yanıtınız" oninput="saveAnswer(${index}, this.value)">`;
+                }
+                htmlContent += `</div>`; card.innerHTML = htmlContent; questionsWrapper.appendChild(card);
+            });
+            document.head.insertAdjacentHTML('beforeend', `<style>.premium-radio-input:checked + .premium-radio-label div > div { transform: scale(1); }.premium-radio-input:checked + .premium-radio-label div { border-color: #00e5ff; }</style>`);
+            totalSteps = SURVEY_CONFIG.questions.length;
+            currentStep = 0;
+            updateUIInfo();
+            animateCardIn(0);
+        }
+        function saveCheckboxAnswer(index) {
+            const card = document.getElementById(`q-card-${index}`);
+            formAnswers[SURVEY_CONFIG.questions[index].id] = [...card.querySelectorAll('input[type="checkbox"]:checked')].map(el=>el.value);
+        }
+
+        function saveAnswer(stepIndex, value) {
+            formAnswers[SURVEY_CONFIG.questions[stepIndex].id] = value;
+        }
+
+        /** =========================================
+         *  3. GSAP ANİMASYONLARI (Dust & Fly Past)
+         *  ========================================= */
+        const btnNext = document.getElementById('btn-next');
+        const btnPrev = document.getElementById('btn-prev');
+        
+        let transitionBusy = false;
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        // Harflerin tamamını büyük parçalar gibi taşımak yerine, gerçek harf maskelerinden
+        // yüzlerce küçük piksel/toz zerresi üretir. Aynı motor girişte birleşme, çıkışta dağılma yapar.
+        let textDustRunId = 0;
+        function animateTextDust(card, mode, done) {
+            const canvas = document.getElementById('text-dust-canvas');
+            const ctx = canvas.getContext('2d', { alpha: true });
+            const dpr = Math.min(window.devicePixelRatio || 1, window.innerWidth < 700 ? 1 : 1.35);
+            const w = window.innerWidth, h = window.innerHeight;
+            canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+            canvas.style.display = 'block';
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.clearRect(0, 0, w, h);
+            const runId = ++textDustRunId;
+            const spans = Array.from(card.querySelectorAll('.dust-char'));
+            const textParents = Array.from(new Set(spans.map(el => el.parentElement)));
+            const particles = [];
+            const hidden = textParents;
+            hidden.forEach(el => el.classList.add('dust-text-hidden'));
+
+            // Her karakterin kendi ölçüsü ve fontuyla alfa maskesi çıkarılır.
+            for (const span of spans) {
+                const char = span.textContent;
+                if (!char || /^\s+$/.test(char)) continue;
+                const rect = span.getBoundingClientRect();
+                if (rect.width < 1 || rect.height < 1) continue;
+                const style = getComputedStyle(span.parentElement);
+                const pad = 4;
+                const ow = Math.max(8, Math.ceil(rect.width) + pad * 2);
+                const oh = Math.max(8, Math.ceil(rect.height) + pad * 2);
+                const off = document.createElement('canvas'); off.width = ow; off.height = oh;
+                const ox = off.getContext('2d', { willReadFrequently: true });
+                ox.clearRect(0, 0, ow, oh); ox.fillStyle = '#fff'; ox.font = style.font;
+                ox.textBaseline = 'middle'; ox.textAlign = 'left';
+                ox.fillText(char, pad, oh / 2, ow - pad);
+                const pixels = ox.getImageData(0, 0, ow, oh).data;
+                const step = window.innerWidth < 700 ? 2.1 : 1.8;
+                for (let y = 0; y < oh; y += step) {
+                    for (let x = 0; x < ow; x += step) {
+                        const alpha = pixels[(Math.floor(y) * ow + Math.floor(x)) * 4 + 3];
+                        if (alpha < 90) continue;
+                        const tx = rect.left + x - pad;
+                        const ty = rect.top + y - pad;
+                        particles.push({ tx, ty, x: mode === 'in' ? tx + (Math.random()-.5)*Math.min(w*.8, 520) : tx,
+                            y: mode === 'in' ? ty + (Math.random()-.5)*Math.min(h*.8, 480) : ty,
+                            z: Math.random()*2, r: .38 + Math.random()*.48,
+                            vx: (Math.random()-.5)*2.5, vy: (Math.random()-.5)*2.5,
+                            phase: Math.random()*6.28, delay: Math.random()*.24 });
+                    }
+                }
+            }
+            // Daha yoğun mikro-toz: mobil ve masaüstü için kontrollü parçacık bütçesi.
+            const cap = window.innerWidth < 700 ? 4500 : 8500;
+            if (particles.length > cap) {
+                const stride = particles.length / cap;
+                const reduced = [];
+                for (let i = 0; i < cap; i++) reduced.push(particles[Math.floor(i * stride)]);
+                particles.length = 0; particles.push(...reduced);
+            }
+            const started = performance.now();
+            const duration = mode === 'in' ? (reduceMotion ? 1 : 1050) : (reduceMotion ? 1 : 430);
+            function frame(now) {
+                if (runId !== textDustRunId) return;
+                const elapsed = now - started;
+                ctx.clearRect(0, 0, w, h);
+                for (const p of particles) {
+                    const t = Math.max(0, Math.min(1, (elapsed / duration - p.delay) / (1-p.delay)));
+                    const ease = mode === 'in' ? 1 - Math.pow(1-t, 3) : t*t;
+                    let x, y, alpha;
+                    if (mode === 'in') {
+                        x = p.x + (p.tx - p.x) * ease; y = p.y + (p.ty - p.y) * ease;
+                        alpha = Math.min(1, t*2.5) * (.72 + .28*Math.sin(elapsed*.012+p.phase));
+                    } else {
+                        x = p.tx + p.vx * elapsed * 1.25; y = p.ty + p.vy * elapsed * 1.25;
+                        alpha = 1-t;
+                    }
+                    ctx.globalAlpha = alpha;
+                    ctx.fillStyle = Math.sin(elapsed*.006+p.phase)>0 ? '#00e5ff' : '#b58cff';
+                    ctx.beginPath(); ctx.arc(x, y, p.r, 0, Math.PI*2); ctx.fill();
+                }
+                ctx.globalAlpha = 1;
+                if (elapsed < duration) requestAnimationFrame(frame);
+                else {
+                    canvas.style.display = 'none'; ctx.clearRect(0,0,w,h);
+                    hidden.forEach(el => el.classList.remove('dust-text-hidden'));
+                    if (done) done();
+                }
+            }
+            requestAnimationFrame(frame);
+        }
+
+        // Panel / controls dust layer. The existing animateTextDust() is deliberately untouched:
+        // headings continue to form from the exact same fine-grain text particles as before.
+        let structureDustRunId = 0;
+        function lineTargets(out, x1, y1, x2, y2, spacing = 3.1, radius = .42) {
+            const length = Math.hypot(x2-x1, y2-y1);
+            const count = Math.max(1, Math.ceil(length / spacing));
+            for (let i=0; i<=count; i++) {
+                const t=i/count;
+                out.push({x:x1+(x2-x1)*t, y:y1+(y2-y1)*t, r:radius+Math.random()*.25});
+            }
+        }
+        function roundedRectTargets(out, rect, radius=16, spacing=3.0, radiusSize=.42) {
+            if (!rect || rect.width < 3 || rect.height < 3) return;
+            const l=rect.left, t=rect.top, r=rect.right, b=rect.bottom;
+            const cr=Math.min(radius, rect.width/2, rect.height/2);
+            lineTargets(out,l+cr,t,r-cr,t,spacing,radiusSize);
+            lineTargets(out,r,t+cr,r,b-cr,spacing,radiusSize);
+            lineTargets(out,r-cr,b,l+cr,b,spacing,radiusSize);
+            lineTargets(out,l,b-cr,l,t+cr,spacing,radiusSize);
+            const corners=[
+                {cx:r-cr,cy:t+cr,a:-Math.PI/2,b:0},
+                {cx:r-cr,cy:b-cr,a:0,b:Math.PI/2},
+                {cx:l+cr,cy:b-cr,a:Math.PI/2,b:Math.PI},
+                {cx:l+cr,cy:t+cr,a:Math.PI,b:Math.PI*1.5}
+            ];
+            for(const c of corners){
+                const arcLen=cr*(c.b-c.a), steps=Math.max(3,Math.ceil(arcLen/spacing));
+                for(let i=1;i<steps;i++){const a=c.a+(c.b-c.a)*i/steps;out.push({x:c.cx+Math.cos(a)*cr,y:c.cy+Math.sin(a)*cr,r:radiusSize+Math.random()*.25});}
+            }
+        }
+        function ellipseTargets(out, rect, spacing=2.7, radius=.38) {
+            if(!rect || rect.width<2 || rect.height<2) return;
+            const rx=rect.width/2, ry=rect.height/2, cx=rect.left+rx, cy=rect.top+ry;
+            const n=Math.max(12,Math.ceil(Math.PI*2*Math.max(rx,ry)/spacing));
+            for(let i=0;i<n;i++){const a=i/n*Math.PI*2;out.push({x:cx+Math.cos(a)*rx,y:cy+Math.sin(a)*ry,r:radius+Math.random()*.22});}
+        }
+        function textTargetsForElement(out, el, valueOverride) {
+            if(!el) return;
+            const rect=el.getBoundingClientRect();
+            if(rect.width<3 || rect.height<3 || rect.bottom<-10 || rect.top>innerHeight+10) return;
+            const style=getComputedStyle(el);
+            let value=valueOverride;
+            if(value == null) value = (el.tagName === 'INPUT') ? (el.value || el.placeholder || '') : (el.innerText || el.textContent || '');
+            value=String(value).replace(/\s+/g,' ').trim();
+            if(!value) return;
+            const padX=(el.tagName==='INPUT')?16:Math.min(10,rect.width*.06);
+            const maxW=Math.max(4,rect.width-padX*1.4);
+            const ow=Math.max(8,Math.ceil(rect.width)), oh=Math.max(8,Math.ceil(rect.height));
+            const off=document.createElement('canvas'); off.width=ow; off.height=oh;
+            const cx=off.getContext('2d',{willReadFrequently:true});
+            cx.clearRect(0,0,ow,oh); cx.fillStyle='#fff'; cx.font=style.font || `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+            cx.textBaseline='middle';
+            const centered=el.id==='step-indicator' || el.tagName==='BUTTON';
+            cx.textAlign=centered?'center':'left';
+            const drawX=centered?ow/2:padX;
+            cx.fillText(value,drawX,oh/2,maxW);
+            const data=cx.getImageData(0,0,ow,oh).data;
+            const sample=window.innerWidth<700?2.25:1.95;
+            for(let y=0;y<oh;y+=sample) for(let x=0;x<ow;x+=sample){
+                if(data[(Math.floor(y)*ow+Math.floor(x))*4+3]>100) out.push({x:rect.left+x,y:rect.top+y,r:.32+Math.random()*.25});
+            }
+        }
+        function collectStructureDustTargets(formContainer, card) {
+            const pts=[]; const panel=formContainer.getBoundingClientRect();
+            // Fine, low-density fill makes the glass panel itself assemble from a sparkling dust field.
+            const step=window.innerWidth<700?13.5:10.5;
+            for(let y=panel.top+7;y<panel.bottom-7;y+=step){
+                for(let x=panel.left+7;x<panel.right-7;x+=step){
+                    if(Math.random()<.54) pts.push({x:x+(Math.random()-.5)*2,y:y+(Math.random()-.5)*2,r:.26+Math.random()*.31});
+                }
+            }
+            roundedRectTargets(pts,panel,30,2.8,.45);
+
+            const progressTrack=formContainer.querySelector(':scope > .absolute');
+            if(progressTrack){
+                const pr=progressTrack.getBoundingClientRect();
+                roundedRectTargets(pts,pr,Math.min(14,pr.height/2),2.6,.37);
+                const bar=progressTrack.querySelector('#progress-bar');
+                if(bar){const br=bar.getBoundingClientRect();roundedRectTargets(pts,br,Math.min(8,br.height/2),2.3,.46);}
+            }
+            // Widget borders and labels participate, but heading/title text remain on their original dust engine.
+            const widgets=Array.from(formContainer.querySelectorAll('.premium-input, .premium-radio-label, .premium-btn'));
+            for(const el of widgets){
+                const r=el.getBoundingClientRect();
+                roundedRectTargets(pts,r,el.classList.contains('premium-btn')?26:15,window.innerWidth<700?3.3:2.8,.4);
+                if(el.classList.contains('premium-radio-label')){
+                    const dot=el.querySelector('div'); if(dot) ellipseTargets(pts,dot.getBoundingClientRect(),2.4,.35);
+                    const labelText=el.querySelector('span'); if(labelText) textTargetsForElement(pts,labelText);
+                } else if(el.classList.contains('premium-input')) {
+                    textTargetsForElement(pts,el);
+                } else {
+                    textTargetsForElement(pts,el);
+                }
+            }
+            const indicator=formContainer.querySelector('#step-indicator');
+            if(indicator) textTargetsForElement(pts,indicator);
+            const footer=formContainer.querySelector(':scope > .mt-auto');
+            if(footer){const fr=footer.getBoundingClientRect();lineTargets(pts,fr.left,fr.top,fr.right,fr.top,2.7,.38);}
+
+            const mobile=window.innerWidth<700, cap=mobile?5200:9000;
+            if(pts.length>cap){const reduced=[],stride=pts.length/cap;for(let i=0;i<cap;i++)reduced.push(pts[Math.floor(i*stride)]);return reduced;}
+            return pts;
+        }
+        function getStructureHideElements(formContainer, card) {
+            const list=[...card.querySelectorAll('.input-wrapper')];
+            const footer=formContainer.querySelector(':scope > .mt-auto');
+            const progress=formContainer.querySelector(':scope > .absolute');
+            if(footer) list.push(footer); if(progress) list.push(progress);
+            return Array.from(new Set(list));
+        }
+        function runStructureDust(targets, mode, done) {
+            const canvas=document.getElementById('structure-dust-canvas');
+            const ctx=canvas.getContext('2d',{alpha:true});
+            const w=window.innerWidth,h=window.innerHeight;
+            const dpr=Math.min(window.devicePixelRatio||1,w<700?1:1.35);
+            canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);canvas.style.display='block';
+            ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
+            const run=++structureDustRunId;
+            const cx=w/2,cy=h/2;
+            const particles=targets.map(p=>{
+                const angle=Math.random()*Math.PI*2;
+                const spread=.35+Math.random()*.85;
+                const distance=Math.max(w,h)*spread;
+                const delay=Math.random()*(mode==='in'?.22:.10);
+                if(mode==='in') return {tx:p.x,ty:p.y,x:p.x+Math.cos(angle)*distance,y:p.y+Math.sin(angle)*distance,
+                    r:p.r||.4,delay,phase:Math.random()*Math.PI*2,depth:.35+Math.random()*1.4};
+                const dir=Math.atan2(p.y-cy,p.x-cx)+(Math.random()-.5)*1.7;
+                const d=Math.max(w,h)*(.32+Math.random()*.76);
+                return {tx:p.x,ty:p.y,x:p.x,y:p.y,ex:p.x+Math.cos(dir)*d,ey:p.y+Math.sin(dir)*d,
+                    r:p.r||.4,delay,phase:Math.random()*Math.PI*2,depth:.35+Math.random()*1.4};
+            });
+            const started=performance.now();
+            const duration=reduceMotion?1:(mode==='in'?1090:535);
+            const clamp=v=>Math.max(0,Math.min(1,v));
+            function frame(now){
+                if(run!==structureDustRunId) return;
+                const elapsed=now-started;ctx.clearRect(0,0,w,h);
+                for(const p of particles){
+                    const t=clamp((elapsed/duration-p.delay)/(1-p.delay));
+                    const e=mode==='in'?1-Math.pow(1-t,3):t*t*(3-2*t);
+                    let x,y,a,r;
+                    if(mode==='in'){
+                        const swirl=Math.sin(t* Math.PI*2+p.phase)*(1-e)*24*p.depth;
+                        x=p.x+(p.tx-p.x)*e+swirl*.45;
+                        y=p.y+(p.ty-p.y)*e+Math.cos(t*Math.PI*2+p.phase)*(1-e)*20*p.depth;
+                        a=clamp(t*3.2)*(.58+.42*Math.sin(elapsed*.012+p.phase)**2);
+                        r=p.r*(.62+.38*e);
+                    } else {
+                        const e2=e;
+                        x=p.x+(p.ex-p.x)*e2+Math.sin(t*6+p.phase)*t*13;
+                        y=p.y+(p.ey-p.y)*e2+Math.cos(t*5+p.phase)*t*13;
+                        a=1-t;r=p.r*(1-.22*t);
+                    }
+                    ctx.globalAlpha=a;
+                    const tone=Math.sin(elapsed*.005+p.phase)>0;
+                    ctx.fillStyle=tone?'#00e5ff':(p.depth>1.15?'#f3f7ff':'#ad85ff');
+                    ctx.beginPath();ctx.arc(x,y,Math.max(.22,r),0,Math.PI*2);ctx.fill();
+                }
+                ctx.globalAlpha=1;
+                if(elapsed<duration) requestAnimationFrame(frame);
+                else {canvas.style.display='none';ctx.clearRect(0,0,w,h);if(done)done();}
+            }
+            frame(started);
+        }
+        function setStructureHidden(formContainer, elements, hidden) {
+            formContainer.classList.toggle('dusting-shell',hidden);
+            elements.forEach(el=>el.classList.toggle('dust-structure-hidden',hidden));
+        }
+
+        function animateCardIn(index, done) {
+            const card = document.getElementById(`q-card-${index}`);
+            if (!card) { if (done) done(); return; }
+            const formContainer=document.getElementById('form-container');
+            card.classList.add('active');
+            const inputs=card.querySelectorAll('.input-wrapper');
+            const headings=card.querySelectorAll('h3, h2');
+            if (reduceMotion) {
+                gsap.set(card,{clearProps:'transform,opacity,filter'});
+                gsap.set(inputs,{clearProps:'all'});
+                headings.forEach(el=>el.classList.remove('dust-text-hidden'));
+                formContainer.classList.remove('dusting-shell');
+                getStructureHideElements(formContainer,card).forEach(el=>el.classList.remove('dust-structure-hidden'));
+                if(done)done();return;
+            }
+            gsap.killTweensOf([inputs,card,formContainer]);
+            gsap.set(card,{clearProps:'transform,opacity,filter'});
+            gsap.set(formContainer,{clearProps:'transform,filter'});
+            headings.forEach(el=>el.classList.add('dust-text-hidden'));
+
+            // Measure the final layout first, then let the entire glass shell + widgets form from dust.
+            const targets=collectStructureDustTargets(formContainer,card);
+            const hideEls=getStructureHideElements(formContainer,card);
+            setStructureHidden(formContainer,hideEls,true);
+            let textFinished=false, structureFinished=false, finished=false;
+            const revealAfterDust=()=>{
+                if(finished||!textFinished||!structureFinished)return;
+                finished=true;
+                setStructureHidden(formContainer,hideEls,false);
+                // Controls materialize just after their dust borders converge; the question's
+                // title/body retain their original, unmodified per-character dust animation.
+                gsap.fromTo(inputs,
+                    {y:24,z:-48,opacity:0,scale:.985,filter:'blur(3px)'},
+                    {y:0,z:0,opacity:1,scale:1,filter:'blur(0px)',duration:.43,stagger:.045,ease:'power3.out',clearProps:'transform,filter',onComplete:()=>{if(done)done();}}
+                );
+            };
+            animateTextDust(card,'in',()=>{textFinished=true;revealAfterDust();});
+            runStructureDust(targets,'in',()=>{structureFinished=true;revealAfterDust();});
+
+            // The outer glass card and the individual question plane move toward the viewer
+            // during the very same dust-assembly beat. No heading spans are transformed here.
+            gsap.fromTo(formContainer,
+                {z:-150,rotationX:3.6,rotationY:index%2?2.2:-2.2,scale:.955,opacity:.94,filter:'blur(3px)',transformOrigin:'50% 50%'},
+                {z:0,rotationX:0,rotationY:0,scale:1,opacity:1,filter:'blur(0px)',duration:.92,ease:'power3.out',clearProps:'transform,filter'}
+            );
+            gsap.fromTo(card,
+                {z:-720,rotationX:10,rotationY:index%2?8:-8,rotationZ:index%2?-.7:.7,scale:.80,opacity:0,filter:'blur(12px)',transformOrigin:'50% 50%'},
+                {z:0,rotationX:0,rotationY:0,rotationZ:0,scale:1,opacity:1,filter:'blur(0px)',duration:1.02,ease:'expo.out',clearProps:'transform,filter'}
+            );
+        }
+
+        function animateCardOut(index, direction, done) {
+            const card=document.getElementById(`q-card-${index}`);
+            if(!card){if(done)done();return;}
+            const formContainer=document.getElementById('form-container');
+            if(reduceMotion){card.classList.remove('active');gsap.set(card,{clearProps:'all'});if(done)done();return;}
+            const inputs=card.querySelectorAll('.input-wrapper');
+            const forward=direction==='next';
+            // Capture the outgoing panel/widget silhouettes, then disassemble them alongside
+            // the existing title/body dust-out. That title/body renderer is not modified.
+            const targets=collectStructureDustTargets(formContainer,card);
+            const hideEls=getStructureHideElements(formContainer,card);
+            setStructureHidden(formContainer,hideEls,true);
+            let textFinished=false,structureFinished=false,finished=false;
+            const finishExit=()=>{
+                if(finished||!textFinished||!structureFinished)return;
+                finished=true;setStructureHidden(formContainer,hideEls,false);
+                gsap.killTweensOf([card,inputs]);card.classList.remove('active');
+                gsap.set(card,{clearProps:'all'});gsap.set(inputs,{clearProps:'all'});
+                if(done)done();
+            };
+            gsap.to(inputs,{y:forward?-18:18,z:forward?35:-25,opacity:0,filter:'blur(2px)',duration:.32,ease:'power2.in'});
+            gsap.to(card,{z:forward?360:-420,rotationX:forward?-4:4,rotationY:forward?-5:5,
+                scale:forward?1.055:.94,opacity:0,filter:'blur(5px)',duration:.43,ease:'power3.in'});
+            animateTextDust(card,'out',()=>{textFinished=true;finishExit();});
+            runStructureDust(targets,'out',()=>{structureFinished=true;finishExit();});
+        }
+
+        function updateUIInfo() {
+            document.getElementById('step-indicator').innerText = `ADIM ${currentStep + 1} / ${totalSteps}`;
+            document.getElementById('progress-bar').style.width = `${((currentStep + 1) / totalSteps) * 100}%`;
+            
+            btnPrev.style.display = currentStep === 0 ? 'none' : 'block';
+
+            if (currentStep === totalSteps - 1) {
+                btnNext.innerHTML = 'GÖNDER';
+                btnNext.style.background = 'linear-gradient(135deg, #00e5ff, #0055ff)';
+            } else {
+                btnNext.innerHTML = 'İLERİ';
+                btnNext.style.background = 'linear-gradient(135deg, #00e5ff, #7000ff)';
+            }
+        }
+
+        function changeStep(direction) {
+            if (transitionBusy) return;
+            if (direction > 0 && currentStep === totalSteps - 1) { submitEpicSequence(); return; }
+            const next = currentStep + direction;
+            if (next < 0 || next >= totalSteps) return;
+            transitionBusy = true;
+            triggerWarpSpeed(1180, 12);
+            const previous = currentStep;
+            animateCardOut(previous, direction > 0 ? 'next' : 'prev', () => {
+                currentStep = next;
+                updateUIInfo();
+                animateCardIn(currentStep, () => { transitionBusy = false; });
+            });
+        }
+        btnNext.addEventListener('click', () => changeStep(1));
+        btnPrev.addEventListener('click', () => changeStep(-1));
+
+        /** =========================================
+         *  4. THE EPIC SUBMIT (Shatter & Explosion)
+         *  ========================================= */
+        function submitEpicSequence() {
+            if (transitionBusy) return;
+            transitionBusy = true;
+            const formContainer = document.getElementById('form-container');
+            const epicText = document.getElementById('epic-submit-text');
+            btnNext.disabled = true;
+            btnPrev.disabled = true;
+
+            // Başlangıç karelerini temizle; tekrar tıklamada önceki animasyondan iz kalmasın.
+            gsap.killTweensOf([formContainer, epicText]);
+            epicText.style.display = 'block';
+            gsap.set(epicText, {
+                opacity: 0, z: -2200, scale: .16, rotationX: -5, rotationY: 2,
+                transformOrigin: '50% 50%', filter: 'blur(18px)', letterSpacing: '.18em'
+            });
+
+            // Kart hafifçe derine çekilip kaybolurken başlık aynı anda yaklaşır.
+            // Eski 3 parçalı timeline kaldırıldı: ara duraklama/yeniden hızlanma yok.
+            gsap.to(formContainer, {
+                rotationX: 10, rotationY: -4, z: -520, scale: .94,
+                opacity: 0, filter: 'blur(5px)', duration: reduceMotion ? .01 : .62,
+                ease: 'power2.in', onComplete: () => { formContainer.style.display = 'none'; }
+            });
+
+            if (reduceMotion) {
+                gsap.set(epicText, { opacity: 1, z: 0, scale: 1, rotationX: 0, rotationY: 0, filter: 'none', letterSpacing: '-.02em' });
+                requestAnimationFrame(impactAndSend);
+                return;
+            }
+
+            // Tek ve kesintisiz 3D hareket: uzaktan gelir, son bölümde hızlanarak kameraya ulaşır.
+            // Opaklık ve netlik ayrı özelliklerde eşzamanlı ilerlediği için başlık bir anda belirmez.
+            const flight = gsap.timeline({ onComplete: impactAndSend });
+            flight.to(epicText, {
+                z: 875, scale: 1.24, rotationX: -2.4, rotationY: 1.7,
+                duration: 1.48, ease: 'expo.in'
+            }, 0)
+            .to(epicText, {
+                opacity: 1, duration: .46, ease: 'power1.out'
+            }, .08)
+            .to(epicText, {
+                filter: 'blur(0px)', letterSpacing: '-.02em',
+                duration: .68, ease: 'power2.out'
+            }, 0);
+        }
+
+        function impactAndSend() {
+            const epicText = document.getElementById('epic-submit-text');
+            const flash = document.getElementById('impact-flash');
+            const ring = document.getElementById('impact-ring');
+            const launchDust = () => {
+                // Çarpışma hissinden hemen sonra aynı mikro-tozlar başarı kartına akar.
+                triggerWarpSpeed(2050, 20);
+                startSuccessDustMorph();
+                sendData();
+            };
+
+            if (epicText) {
+                gsap.killTweensOf(epicText);
+                epicText.style.display = 'block';
+                epicText.style.visibility = 'visible';
+                epicText.classList.add('epic-impact');
+                gsap.set(epicText, { opacity: 1 });
+            }
+            if (reduceMotion || !epicText) {
+                launchDust();
+                return;
+            }
+
+            // Son duruşta renk patlar, yazı birkaç kare titreşir ve parlak bir şok halkası açılır.
+            gsap.killTweensOf([flash, ring]);
+            if (flash) gsap.fromTo(flash, { opacity: 0 }, { opacity: .82, duration: .075, yoyo: true, repeat: 1, ease: 'power2.out' });
+            if (ring) gsap.fromTo(ring,
+                { scale: .12, opacity: .98, rotation: -8 },
+                { scale: 14, opacity: 0, rotation: 18, duration: .58, ease: 'power3.out', transformOrigin: '50% 50%' }
+            );
+            gsap.timeline({ onComplete: launchDust })
+                .to(epicText, { scale: 1.34, rotationZ: .8, filter: 'brightness(2.2) saturate(1.8)', duration: .085, ease: 'power4.out' })
+                .to(epicText, { x: 7, y: -2, rotationZ: -1.6, scale: 1.27, duration: .045, repeat: 3, yoyo: true, ease: 'none' })
+                .to(epicText, { x: 0, y: 0, rotationZ: 0, scale: 1.52, filter: 'brightness(2.5) saturate(1.9)', duration: .105, ease: 'power4.in' });
+        }
+
+        /*
+         * Tek bir mikro-parçacık sistemi:
+         * 1) GÖNDERİLİYOR yazısının gerçek harf maskesinden doğar.
+         * 2) Çarpma anında küçük zerreler halinde uzaya yayılır.
+         * 3) Aynı zerreler başarı kartının çerçevesi, onay işareti ve gerçek metinlerinin
+         *    piksel maskesine birleşir. Ardından mevcut başarı arayüzü görünür olur.
+         */
+        function startSuccessDustMorph() {
+            const canvas = document.getElementById('morph-canvas');
+            const ctx = canvas.getContext('2d', { alpha: true });
+            const w = window.innerWidth, h = window.innerHeight;
+            const dpr = Math.min(window.devicePixelRatio || 1, w < 700 ? 1 : 1.35);
+            canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+            canvas.style.display = 'block';
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.clearRect(0, 0, w, h);
+            const epic = document.getElementById('epic-submit-text');
+
+            const makeMaskPoints = (draw, step = (w < 700 ? 3.1 : 2.65)) => {
+                const off = document.createElement('canvas'); off.width = Math.round(w); off.height = Math.round(h);
+                const ox = off.getContext('2d', { willReadFrequently: true });
+                draw(ox, off.width, off.height);
+                const data = ox.getImageData(0, 0, off.width, off.height).data;
+                const pts = [];
+                for (let y = 0; y < off.height; y += step) for (let x = 0; x < off.width; x += step) {
+                    if (data[(Math.floor(y) * off.width + Math.floor(x)) * 4 + 3] > 100) pts.push({ x, y });
+                }
+                return pts;
+            };
+
+            // Kaynak maskesi, ekranda gerçekten görünen GÖNDERİLİYOR yazısının
+            // ölçülmüş DOM kutusundan çıkarılır. Böylece büyük sahte parçalar değil,
+            // her glifin içinden doğan, soru yazılarındakiyle aynı boyda zerreler oluşur.
+            const source = makeMaskPoints((c) => {
+                const rect = epic ? epic.getBoundingClientRect() : { left: 0, top: 0, width: w, height: h };
+                const style = epic ? getComputedStyle(epic) : null;
+                const baseSize = style ? (parseFloat(style.fontSize) || Math.min(w * .105, 92)) : Math.min(w * .105, 92);
+                const projectedScale = epic && epic.offsetHeight > 0 ? Math.max(.65, Math.min(4.5, rect.height / epic.offsetHeight)) : 1;
+                const size = baseSize * projectedScale;
+                const weight = style ? style.fontWeight : '900';
+                const family = style ? style.fontFamily : 'Inter, Arial, sans-serif';
+                const tracking = style ? style.letterSpacing : '-.02em';
+                c.fillStyle = '#fff'; c.textAlign = 'center'; c.textBaseline = 'middle';
+                c.font = `${weight} ${size}px ${family}`;
+                // Canvas destekliyorsa CSS harf aralığını da uygula; değilse yatay ölçekleme
+                // ile gerçek yazı genişliğine oturtulur.
+                try { if ('letterSpacing' in c) c.letterSpacing = tracking; } catch (_) {}
+                const text = 'GÖNDERİLİYOR';
+                const metrics = c.measureText(text);
+                const cssTracking = parseFloat(tracking) || 0;
+                const naturalWidth = Math.max(1, metrics.width + cssTracking * (text.length - 1));
+                const targetWidth = Math.max(1, rect.width || naturalWidth);
+                const xScale = Math.max(.55, Math.min(1.65, targetWidth / naturalWidth));
+                c.save();
+                c.translate((rect.left || 0) + (rect.width || w) / 2, (rect.top || 0) + (rect.height || h) / 2);
+                c.scale(xScale, 1);
+                c.fillText(text, 0, 0);
+                c.restore();
+            }, w < 700 ? 1.05 : 1.1);
+
+            // Bitiş maskesi: orijinal başarı kartının geometrisine ve metinlerine göre çizilir.
+            const successCard = document.querySelector('.success-card');
+            const cardW = Math.min(w - 32, successCard ? successCard.getBoundingClientRect().width || 560 : 560);
+            const cardH = Math.min(h - 36, successCard ? successCard.getBoundingClientRect().height || 270 : 270);
+            const left = (w-cardW)/2, top = (h-cardH)/2, right = left+cardW, bottom = top+cardH;
+            const target = makeMaskPoints((c) => {
+                c.strokeStyle = '#fff'; c.lineWidth = 1.3;
+                const r = Math.min(32, cardW*.07);
+                c.beginPath(); c.moveTo(left+r,top); c.lineTo(right-r,top); c.quadraticCurveTo(right,top,right,top+r);
+                c.lineTo(right,bottom-r); c.quadraticCurveTo(right,bottom,right-r,bottom); c.lineTo(left+r,bottom);
+                c.quadraticCurveTo(left,bottom,left,bottom-r); c.lineTo(left,top+r); c.quadraticCurveTo(left,top,left+r,top); c.stroke();
+                // Onay işareti
+                const cy = top + cardH*.27;
+                c.lineWidth = Math.max(2, Math.min(4, w/130)); c.lineCap='round'; c.lineJoin='round';
+                c.beginPath(); c.moveTo(w/2-15,cy); c.lineTo(w/2-4,cy+11); c.lineTo(w/2+19,cy-16); c.stroke();
+                // Başlık ve teşekkür yazısı: içerik aynen korunur.
+                c.textAlign='center'; c.textBaseline='middle'; c.fillStyle='#fff';
+                const titleSize = w < 500 ? 21 : 30;
+                c.font = `700 ${titleSize}px Inter, Arial, sans-serif`;
+                c.fillText('Yanıtınız Kaydedildi', w/2, top+cardH*.53, cardW-28);
+                c.fillStyle='#fff'; c.font=`300 ${w<500?13:17}px Inter, Arial, sans-serif`;
+                c.fillText('Katılımınız için teşekkür ederiz.', w/2, top+cardH*.68, cardW-26);
+            }, w < 700 ? 1.7 : 1.5);
+
+            // Kaynak ve hedef maskelerinden aynı sayıda zerre seçilir; her tanecik ~1 px.
+            const count = Math.min(w < 700 ? 5200 : 10500, source.length, target.length);
+            const pick = (arr, n) => {
+                if (arr.length <= n) return arr.slice();
+                const out=[]; const stride=arr.length/n;
+                for(let i=0;i<n;i++) out.push(arr[Math.floor(i*stride)]);
+                return out;
+            };
+            const src = pick(source, count), dst = pick(target, count);
+            const cx=w/2, cy=h/2;
+            const particles = src.map((p,i)=>{
+                const a=Math.random()*Math.PI*2, radius=Math.max(w,h)*(.28+Math.random()*.48);
+                return { sx:p.x, sy:p.y, bx:cx+Math.cos(a)*radius, by:cy+Math.sin(a)*radius+(Math.random()-.5)*160,
+                    tx:dst[i].x, ty:dst[i].y, r:.34+Math.random()*.40, phase:Math.random()*6.28,
+                    drift:(Math.random()-.5)*18 };
+            });
+            const started=performance.now();
+            const easeOut=t=>1-Math.pow(1-t,3);
+            function frame(now) {
+                const elapsed=now-started; ctx.clearRect(0,0,w,h);
+                // 0-250ms: harflerden kopuş; 250-720ms: geniş, yoğun toz bulutu;
+                // 720-2050ms: aynı zerrelerin daha sinematik ve kontrollü biçimde hedefe toplanması.
+                const gatherT=Math.max(0,Math.min(1,(elapsed-720)/1330));
+                const gather=gatherT<.5 ? 4*gatherT*gatherT*gatherT : 1-Math.pow(-2*gatherT+2,3)/2;
+                for(const p of particles){
+                    let x,y,a;
+                    if(elapsed<250){ const t=elapsed/250; x=p.sx+(p.bx-p.sx)*t; y=p.sy+(p.by-p.sy)*t; a=1; }
+                    else if(elapsed<720){ const t=(elapsed-250)/470; x=p.bx+p.drift*t; y=p.by+Math.sin(p.phase+elapsed*.009)*12*t; a=1-t*.12; }
+                    else { x=p.bx*(1-gather)+p.tx*gather; y=p.by*(1-gather)+p.ty*gather; a=.92; }
+                    ctx.globalAlpha=a*(.72+.28*Math.sin(elapsed*.012+p.phase));
+                    ctx.fillStyle=Math.sin(elapsed*.006+p.phase)>0?'#00e5ff':'#b58cff';
+                    // Soru yazılarındaki mikro-zerrelerle aynı keskinlikte kalır.
+                    // Ek gölge/blur çizilmediğinden zerreler iri parçalar gibi görünmez.
+                    ctx.shadowBlur=0;
+                    ctx.beginPath(); ctx.arc(x,y,p.r,0,Math.PI*2); ctx.fill();
+                }
+                ctx.globalAlpha=1; ctx.shadowBlur=0;
+                if(elapsed<2070) requestAnimationFrame(frame);
+                else {
+                    canvas.style.display='none'; ctx.clearRect(0,0,w,h);
+                    if(epic) { epic.style.display='none'; epic.style.visibility=''; }
+                    const screen=document.getElementById('success-screen');
+                    sendData().then(result => {
+                        document.getElementById('success-title').textContent = 'Yanıt gönderildi';
+                        document.getElementById('success-message').textContent = result.message || 'Yanıtınız Google Forms’a kaydedildi.';
+                    }).catch(err => {
+                        document.getElementById('success-title').textContent = 'Gönderilemedi';
+                        document.getElementById('success-message').textContent = err.message || 'Yanıt Google Forms’a gönderilemedi.';
+                    }).finally(() => {
+                        screen.style.pointerEvents='auto';
+                        gsap.fromTo(screen,{opacity:0},{opacity:1,duration:.75,ease:'power2.out'});
+                        gsap.fromTo('.success-card',{scale:.97,y:8,filter:'blur(5px)'},{scale:1,y:0,filter:'blur(0px)',duration:.8,ease:'power3.out',clearProps:'transform,filter'});
+                    });
+                }
+            }
+            // İlk karede metin maskesinin zerreleri çizilir; DOM yazısı aynı paint öncesinde
+            // gizlenir. Böylece fade/scale tween'i araya girip patlamayı büyük parçalara ayırmaz.
+            frame(started);
+            if(epic) epic.style.visibility='hidden';
+        }
+
+        function sendData() {
+            return new Promise((resolve, reject) => {
+                if (!window.google || !google.script || !google.script.run) { reject(new Error('Bu sayfa Apps Script web uygulaması olarak yayımlanmamış.')); return; }
+                google.script.run.withSuccessHandler(resolve).withFailureHandler(err=>reject(new Error(err.message || 'Gönderim başarısız.'))).submitSurvey(SURVEY_CONFIG.token, formAnswers, document.getElementById('respondent-email')?.value || '');
+            });
+        }
+
+        document.getElementById('create-url-btn').addEventListener('click', () => {
+            const field = document.getElementById('google-form-url');
+            const status = document.getElementById('setup-status');
+            const wrap = document.getElementById('generated-url-wrap');
+            let parsed; try { parsed = new URL(field.value.trim()); } catch (_) { parsed = null; }
+            if (!parsed || parsed.protocol !== 'https:' || parsed.hostname !== 'docs.google.com' || !parsed.pathname.includes('/forms/')) { status.textContent = 'Geçerli bir https://docs.google.com/forms/... bağlantısı gir.'; wrap.classList.add('hidden'); return; }
+            if (!window.google || !google.script || !google.script.run) { status.textContent = 'Gerçek senkronizasyon için bu HTML, Apps Script web uygulaması olarak yayımlanmalı. GitHub Pages tek başına yeterli değil.'; return; }
+            status.textContent = 'Form doğrulanıyor ve bağlantı hazırlanıyor…';
+            google.script.run.withSuccessHandler(result => { document.getElementById('generated-url').textContent = result.url; wrap.classList.remove('hidden'); status.textContent = result.message; }).withFailureHandler(err => { status.textContent = err.message || 'Form okunamadı. Form erişimini ve bağlantıyı kontrol et.'; }).createSurveyLink(parsed.href);
+        });
+        document.getElementById('copy-url-btn').addEventListener('click', async () => {
+            const value = document.getElementById('generated-url').textContent;
+            try {
+                await navigator.clipboard.writeText(value);
+                document.getElementById('setup-status').textContent = 'Bağlantı panoya kopyalandı.';
+            } catch (_) {
+                document.getElementById('setup-status').textContent = 'Otomatik kopyalama desteklenmedi. Bağlantıyı seçip elle kopyalayabilirsin.';
+            }
+        });
+        document.getElementById('preview-url-btn').addEventListener('click', () => {
+            const value = document.getElementById('generated-url').textContent;
+            if (value) window.location.href = value;
+        });
+
+
+        /** =========================================
+         *  5. THREE.JS MOTORU (Yıldızlar + Gerçek 3D Uzay)
+         *  ========================================= */
+        const canvas = document.getElementById('bg-canvas');
+        const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, window.innerWidth < 700 ? 1.15 : 1.5));
+        renderer.setSize(window.innerWidth, window.innerHeight);
+
+        const scene = new THREE.Scene();
+        const universe = new THREE.Group();
+        scene.add(universe);
+        scene.fog = new THREE.FogExp2(0x030305, 0.001);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 1, 4000);
+        camera.position.z = 1000;
+
+        // --- A. STARFIELD (Yıldızlar) ---
+        const starsGeo = new THREE.BufferGeometry();
+        const starsCount = window.innerWidth < 700 ? 3400 : 5200;
+        const starsPos = new Float32Array(starsCount * 3);
+        for(let i=0; i<starsCount*3; i++) {
+            starsPos[i] = (Math.random() - 0.5) * 4000;
+        }
+        starsGeo.setAttribute('position', new THREE.BufferAttribute(starsPos, 3));
+        const starsMat = new THREE.PointsMaterial({ color: 0xffffff, size: 2, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending });
+        const starsMesh = new THREE.Points(starsGeo, starsMat);
+        universe.add(starsMesh);
+
+        // --- B. PREMIUM FLOATING ABSTRACT GEOMETRY ---
+        // Gezegenler yerine derinlikte süzülen kristal tel kafesler, torus yörüngeleri
+        // ve geometrik düğümler kullanılır. Yaklaştıkça perspektif doğal olarak büyütür.
+        const shapes = [];
+        const mobileQuality = window.innerWidth < 700;
+        scene.fog = new THREE.FogExp2(0x030305, 0.00016);
+        scene.add(new THREE.AmbientLight(0x7889df, 0.65));
+        const cyanLight = new THREE.PointLight(0x00e5ff, 1.25, 6000);
+        cyanLight.position.set(-900, 450, 500); scene.add(cyanLight);
+        const violetLight = new THREE.PointLight(0x8b45ff, 1.1, 6500);
+        violetLight.position.set(1100, -500, -350); scene.add(violetLight);
+
+        function nebulaTexture(colors, seed = 1) {
+            const texCanvas = document.createElement('canvas');
+            texCanvas.width = 512; texCanvas.height = 320;
+            const ctx = texCanvas.getContext('2d');
+            let n = seed * 9871 + 17;
+            const rnd = () => { n = (n * 16807) % 2147483647; return n / 2147483647; };
+            ctx.clearRect(0, 0, 512, 320);
+            for (let i = 0; i < 26; i++) {
+                const x = rnd() * 512, y = rnd() * 320, r = 32 + rnd() * 142;
+                const col = colors[i % colors.length];
+                const rgba = col.replace('rgb(', 'rgba(').replace(')', ', 0.21)');
+                const mid = col.replace('rgb(', 'rgba(').replace(')', ', 0.075)');
+                const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+                g.addColorStop(0, rgba); g.addColorStop(.4, mid); g.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = g; ctx.fillRect(x-r, y-r, r*2, r*2);
+            }
+            ctx.globalCompositeOperation = 'screen';
+            for (let i = 0; i < 50; i++) {
+                const x = rnd()*512, y = rnd()*320;
+                ctx.beginPath(); ctx.moveTo(x-70,y+20);
+                ctx.bezierCurveTo(x-20,y-55-rnd()*35,x+30,y+58+rnd()*25,x+90,y-15);
+                ctx.strokeStyle = `rgba(150,175,255,${.012+rnd()*.035})`;
+                ctx.lineWidth = 1+rnd()*4; ctx.stroke();
+            }
+            const texture = new THREE.CanvasTexture(texCanvas);
+            texture.encoding = THREE.sRGBEncoding;
+            return texture;
+        }
+
+        const nebulae = [];
+        const nebulaDefs = [
+            {x:-180,y:220,z:-2550,w:4300,h:2350,colors:['rgb(20,90,255)','rgb(148,30,255)','rgb(0,220,255)'],seed:3,opacity:.18},
+            {x:540,y:-180,z:-2920,w:4550,h:2520,colors:['rgb(255,35,150)','rgb(70,35,255)','rgb(0,145,255)'],seed:8,opacity:.125},
+            {x:-920,y:-440,z:-3200,w:3950,h:2220,colors:['rgb(20,230,210)','rgb(65,55,255)','rgb(210,30,255)'],seed:15,opacity:.105}
+        ];
+        nebulaDefs.forEach((def, i) => {
+            const texture = nebulaTexture(def.colors, def.seed);
+            const material = new THREE.MeshBasicMaterial({ map:texture, transparent:true, opacity:def.opacity,
+                depthWrite:false, side:THREE.DoubleSide, blending:THREE.AdditiveBlending });
+            const mesh = new THREE.Mesh(new THREE.PlaneGeometry(def.w, def.h), material);
+            mesh.position.set(def.x, def.y, def.z); mesh.rotation.z = (i-1)*.13;
+            mesh.userData.drift = (i%2 ? 1 : -1) * .000055;
+            universe.add(mesh); nebulae.push(mesh);
+        });
+
+        const wireMaterials = [
+            new THREE.MeshBasicMaterial({color:0x00e5ff, wireframe:true, transparent:true, opacity:.33, depthWrite:false, blending:THREE.AdditiveBlending}),
+            new THREE.MeshBasicMaterial({color:0x8c59ff, wireframe:true, transparent:true, opacity:.30, depthWrite:false, blending:THREE.AdditiveBlending}),
+            new THREE.MeshBasicMaterial({color:0xff56df, wireframe:true, transparent:true, opacity:.25, depthWrite:false, blending:THREE.AdditiveBlending}),
+            new THREE.MeshBasicMaterial({color:0x7aafff, wireframe:true, transparent:true, opacity:.29, depthWrite:false, blending:THREE.AdditiveBlending})
+        ];
+        const orbitMaterials = [
+            new THREE.MeshBasicMaterial({color:0x00e5ff, wireframe:true, transparent:true, opacity:.30, depthWrite:false, blending:THREE.AdditiveBlending}),
+            new THREE.MeshBasicMaterial({color:0x8651ff, wireframe:true, transparent:true, opacity:.24, depthWrite:false, blending:THREE.AdditiveBlending}),
+            new THREE.MeshBasicMaterial({color:0xff4fce, wireframe:true, transparent:true, opacity:.21, depthWrite:false, blending:THREE.AdditiveBlending})
+        ];
+        // Merkezdeki uzun tünel halkaları kaldırıldı; kenarlardaki kristal yapılar ve yörüngeleri korunur.
+        const fovTangent = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+        function placeAtOuterField(group, randomizeY = true) {
+            const depth = Math.max(450, camera.position.z - group.position.z);
+            const halfW = fovTangent * depth * (window.innerWidth / Math.max(1, window.innerHeight));
+            const halfH = fovTangent * depth;
+            group.position.x = group.userData.side * halfW * (0.76 + Math.random() * 0.18);
+            if (randomizeY) group.position.y = (Math.random() - .5) * halfH * (mobileQuality ? 1.45 : 1.6);
+            group.userData.baseY = group.position.y;
+        }
+        function makeAbstractStructure(index) {
+            const group = new THREE.Group();
+            const size = mobileQuality ? 92 + Math.random()*62 : 125 + Math.random()*105;
+            const type = index % 5;
+            let geometry;
+            if (type === 0) geometry = new THREE.IcosahedronGeometry(size, 1);
+            else if (type === 1) geometry = new THREE.TorusKnotGeometry(size*.68, Math.max(1.4,size*.015), mobileQuality?72:108, 7, 2, 3);
+            else if (type === 2) geometry = new THREE.OctahedronGeometry(size, 1);
+            else if (type === 3) geometry = new THREE.DodecahedronGeometry(size, 0);
+            else geometry = new THREE.TetrahedronGeometry(size, 1);
+            const core = new THREE.Mesh(geometry, wireMaterials[index % wireMaterials.length]);
+            core.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
+            group.add(core);
+
+            // Asimetrik, farklı düzlemlerde kesişen ince halkalar; gezegen halkası gibi değil,
+            // soyut holografik yörünge/enerji diyagramı hissi verir.
+            const ringA = new THREE.Mesh(
+                new THREE.TorusGeometry(size*1.18, Math.max(.8,size*.007), 4, mobileQuality?56:84),
+                orbitMaterials[index % orbitMaterials.length]
+            );
+            ringA.rotation.set(.9 + Math.random()*.35, .2 + Math.random()*.7, .45 + Math.random()*.5);
+            group.add(ringA);
+            const ringB = new THREE.Mesh(
+                new THREE.TorusGeometry(size*1.48, Math.max(.65,size*.0055), 4, mobileQuality?56:84),
+                orbitMaterials[(index+1) % orbitMaterials.length]
+            );
+            ringB.rotation.set(.2 + Math.random()*.6, 1.0 + Math.random()*.5, .8 + Math.random()*.6);
+            group.add(ringB);
+            if (index % 3 === 0) {
+                const ringC = new THREE.Mesh(
+                    new THREE.TorusGeometry(size*.88, Math.max(.6,size*.0045), 4, mobileQuality?48:72),
+                    orbitMaterials[(index+2) % orbitMaterials.length]
+                );
+                ringC.rotation.set(1.2, .25, .15); group.add(ringC);
+            }
+
+            group.userData.side = index % 2 === 0 ? -1 : 1;
+            group.userData.travelSpeed = .48 + Math.random()*.58;
+            group.userData.floatSeed = Math.random()*Math.PI*2;
+            group.userData.baseScale = .70 + Math.random()*.46;
+            group.userData.rotationSpeed = {x:(Math.random()-.5)*.0038, y:(Math.random()-.5)*.0046, z:(Math.random()-.5)*.0024};
+            group.scale.setScalar(group.userData.baseScale);
+            group.position.z = -850 - Math.random()*2050;
+            group.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
+            placeAtOuterField(group);
+            universe.add(group); shapes.push(group);
+        }
+        const structureCount = mobileQuality ? 7 : 12;
+        for (let i = 0; i < structureCount; i++) makeAbstractStructure(i);
+
+        // --- ETKİLEŞİM & ANİMASYON DÖNGÜSÜ ---
+        let mouseX=0,mouseY=0;
+        let warpSpeed=1;
+        let cameraDepthOffset=0;
+        const warpState={speed:1,depth:0};
+        let warpResetTimer=null;
+        function triggerWarpSpeed(duration=1000,maxSpeed=15){
+            if(warpResetTimer!==null) clearTimeout(warpResetTimer);
+            gsap.killTweensOf(warpState);
+            gsap.to(warpState,{speed:maxSpeed,depth:-Math.min(440,180+maxSpeed*12),duration:.30,ease:'power3.in',
+                onUpdate:()=>{warpSpeed=warpState.speed;cameraDepthOffset=warpState.depth;}});
+            warpResetTimer=setTimeout(()=>{
+                gsap.to(warpState,{speed:1,depth:0,duration:.92,ease:'power3.out',
+                    onUpdate:()=>{warpSpeed=warpState.speed;cameraDepthOffset=warpState.depth;}});
+            },duration);
+        }
+        function orientationSwoop(){
+            // Turning the phone rotates the 3D universe and creates a short perspective pass.
+            triggerWarpSpeed(1250,11);
+            gsap.killTweensOf(universe.rotation);
+            gsap.timeline()
+                .to(universe.rotation,{x:.15,y:-.19,z:.055,duration:.42,ease:'power3.out'})
+                .to(universe.rotation,{x:0,y:0,z:0,duration:.86,ease:'power2.inOut'});
+        }
+        window.addEventListener('orientationchange',()=>{setTimeout(orientationSwoop,80);});
+
+        document.addEventListener('mousemove', (e) => {
+            mouseX = (e.clientX / Math.max(1, window.innerWidth) - .5) * 150;
+            mouseY = (e.clientY / Math.max(1, window.innerHeight) - .5) * 100;
+        });
+        document.addEventListener('touchmove', (e) => {
+            if (e.touches.length > 0) {
+                mouseX = (e.touches[0].clientX / Math.max(1, window.innerWidth) - .5) * 170;
+                mouseY = (e.touches[0].clientY / Math.max(1, window.innerHeight) - .5) * 115;
+            }
+        });
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / Math.max(1, window.innerHeight);
+            camera.updateProjectionMatrix();
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, window.innerWidth < 700 ? 1.1 : 1.4));
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            shapes.forEach(shape => placeAtOuterField(shape, true));
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (document.hidden) return;
+
+            // Yıldızları hareket ettir (Warp)
+            const positions = starsMesh.geometry.attributes.position.array;
+            for(let i=2; i<starsCount*3; i+=3) {
+                positions[i] += (0.8 * warpSpeed);
+                if(positions[i] > 1000) positions[i] = -3000;
+            }
+            starsMesh.geometry.attributes.position.needsUpdate = true;
+            
+            // Warp hızındayken yıldızları uzat/rengini değiştir
+            if(warpSpeed > 2) {
+                starsMat.color.setHSL((Date.now()%2000)/2000, 1, 0.7);
+                starsMat.size = 4;
+            } else {
+                starsMat.color.setHex(0xffffff);
+                starsMat.size = 2;
+            }
+
+            // Tel-kafes düğümleri döner, salınır ve yavaşça kameraya yaklaşır.
+            // Gerçek perspektif büyütmesi, şekillerin çarpacakmış gibi yaklaşmasını sağlar.
+            const clockNow = performance.now();
+            shapes.forEach(shape => {
+                const rot = shape.userData.rotationSpeed;
+                shape.rotation.x += rot.x; shape.rotation.y += rot.y; shape.rotation.z += rot.z;
+                shape.position.y = shape.userData.baseY + Math.sin(clockNow*.00032 + shape.userData.floatSeed)*16;
+                shape.position.z += shape.userData.travelSpeed * (.30 + Math.min(warpSpeed, 20)*.12);
+                if (shape.position.z > -360) {
+                    shape.position.z = -2850 - Math.random()*650;
+                    shape.userData.baseScale = .70 + Math.random()*.46;
+                    shape.scale.setScalar(shape.userData.baseScale);
+                    placeAtOuterField(shape, true);
+                }
+            });
+            nebulae.forEach(nebula => { nebula.rotation.z += nebula.userData.drift; });
+
+            // Camera parallax plus a forward dolly during navigation/impact: perspective makes
+            // the 3D rings and wire structures rush past the viewer rather than only sliding sideways.
+            camera.position.x += (mouseX - camera.position.x) * 0.05;
+            camera.position.y += (-mouseY - camera.position.y) * 0.05;
+            camera.position.z += ((1000+cameraDepthOffset)-camera.position.z)*.095;
+            camera.lookAt(scene.position);
+
+            renderer.render(scene, camera);
+        }
+
+        window.onload = () => {
+            animate();
+            if (sharedToken) {
+                if (!window.google || !google.script || !google.script.run) {
+                    document.getElementById('setup-status').textContent = 'Bu bağlantı Apps Script web uygulaması içinde açılmalıdır.';
+                    return;
+                }
+                google.script.run.withSuccessHandler(data => {
+                    if (data.closed) { document.getElementById('success-title').textContent='Anket kapatıldı'; document.getElementById('success-message').textContent='Google Forms sahibi yanıt kabulünü kapatmış veya anketi silmiş.'; document.getElementById('success-screen').style.pointerEvents='auto'; document.getElementById('success-screen').style.opacity='1'; return; }
+                    SURVEY_CONFIG.questions = data.questions; SURVEY_CONFIG.formUrl = data.formUrl; buildForm();
+                }).withFailureHandler(err => { document.getElementById('success-title').textContent='Anket açılamadı'; document.getElementById('success-message').textContent=err.message || 'Bağlantı geçersiz veya form erişilemiyor.'; document.getElementById('success-screen').style.pointerEvents='auto'; document.getElementById('success-screen').style.opacity='1'; }).loadSurvey(sharedToken);
+            }
+        };
+    </script>
+</body>
+</html>
