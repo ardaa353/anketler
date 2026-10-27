@@ -61,24 +61,113 @@ function sceneDust(){
   ctx.globalAlpha=Math.min(1,t*3)*(1-t*.25);for(const p of pts){ctx.fillStyle=Math.sin(now*.01+p.phase)>0?'#00e5ff':'#ae88ff';ctx.fillRect(p.rx+(p.x-p.rx)*a,p.ry+(p.y-p.ry)*a,.85,.85);}ctx.globalAlpha=1;
   if(t<1)requestAnimationFrame(frame);else{ctx.clearRect(0,0,width,height);el.style.display='none';}};requestAnimationFrame(frame);
 }
-function layout(content){root.hidden=false;ui.style.display='none';root.innerHTML=`<div class="ad-layout"><header class="ad-header"><div class="ad-brand"><img src="logo.png" alt="EBYÜ İdeal Hukuk Kulübü"><div><h1>İdeal Hukuk Kulübü</h1><div class="ad-muted">3D Anket Yönetim Merkezi</div></div></div><div class="ad-row"><span class="ad-chip ad-live">Supabase · Gerçek veriler</span><button class="ad-btn-ghost" data-act="logout">Çıkış</button></div></header><nav class="ad-nav"><button data-act="home" class="${state.mode==='home'?'active':''}">Anketler</button><button data-act="new" class="${state.mode==='edit'?'active':''}">+ Yeni Anket</button><button data-act="answers" class="${state.mode==='answers'?'active':''}">Yanıtlar ve İstatistik</button></nav>${msg()}${content}<footer class="ad-small" style="margin:28px 0">Yanıtlar Supabase PostgreSQL veritabanında tutulur. Görüntüleme olayları kimlik tespiti yapmaz; dosyalar için R2 yapılandırması gerekir.</footer></div>`;requestAnimationFrame(sceneDust);}
+function layout(content){root.hidden=false;ui.style.display='none';root.innerHTML=`<div class="ad-layout"><header class="ad-header"><div class="ad-brand"><img src="logo.png" alt="EBYÜ İdeal Hukuk Kulübü"><div><h1>İdeal Hukuk Kulübü</h1><div class="ad-muted">3D Anket Yönetim Merkezi</div></div></div><div class="ad-row"><span class="ad-chip ad-live">Supabase · Gerçek veriler</span><button class="ad-btn-ghost" data-act="logout">Çıkış</button></div></header><nav class="ad-nav"><button data-act="home" class="${state.mode==='home'?'active':''}">Anketler</button><button data-act="new" class="${state.mode==='edit'?'active':''}">+ Yeni Anket</button><button data-act="answers" class="${state.mode==='answers'?'active':''}">Yanıtlar ve İstatistik</button></nav>${msg()}${content}<footer class="ad-small" style="margin:28px 0">En fazla 10 anket tutulur. Yeni yayımlanan anket, sırası gelen eski anketi ve yanıtlarını veritabanından siler. Dosya yükleme bu sürümde kapalıdır.</footer></div>`;requestAnimationFrame(sceneDust);}
 function loginPage(){state.mode='login';root.hidden=false;ui.style.display='none';root.innerHTML=`<main class="ad-login-wrap"><section class="ad-panel ad-login"><img src="logo.png" alt="İdeal Hukuk Kulübü"><h1>Yönetici Girişi</h1><p>İdeal Hukuk Kulübü · 3D Anket Sistemi</p>${!configured()?'<div class="ad-error">Supabase ayarları eksik. <code>config.js</code> dosyasını doldurun.</div>':''}<form id="login-form"><label class="ad-field"><span>Kullanıcı adı</span><input class="ad-input" name="username" autocomplete="username" required></label><label class="ad-field"><span>Şifre</span><input class="ad-input" name="password" type="password" autocomplete="current-password" required></label>${msg()}<button type="submit" class="ad-btn" style="width:100%">Giriş Yap</button></form><p class="ad-small">Giriş Supabase Auth ile, yönetici yetkisi PostgreSQL üzerinde doğrulanır.</p></section></main>`;requestAnimationFrame(sceneDust);}
-function card(s){let st=s.status==='active'?'● Aktif':s.status==='draft'?'○ Taslak':s.status==='paused'?'◌ Durduruldu':'◌ Arşiv';return `<article class="ad-survey-card"><div class="ad-row" style="justify-content:space-between"><span class="ad-chip ${s.status==='active'?'ad-live':''}">${st}</span><span class="ad-small">${stamp(s.updated_at)}</span></div><h3>${esc(s.title)}</h3><div class="ad-kpi">${s.response_count||0}</div><div class="ad-stat">Yanıt · ${s.view_count||0} görüntüleme olayı</div><div class="ad-row" style="margin-top:16px"><button class="ad-btn-ghost" data-act="edit" data-id="${s.id}">Düzenle</button><button class="ad-btn-ghost" data-act="responses" data-id="${s.id}">Yanıtlar</button>${s.status==='active'?`<button class="ad-btn-warn" data-act="pause" data-id="${s.id}">Durdur</button>`:`<button class="ad-btn" data-act="republish" data-id="${s.id}">Yayınla</button>`}</div>${s.status==='active'?`<div class="ad-link" style="margin-top:12px"><code>${esc(link(s.id))}</code><button class="ad-btn-ghost" data-act="copy" data-id="${s.id}">Kopyala</button><a target="_blank" rel="noopener" href="${esc(link(s.id))}">Aç ↗</a></div>`:''}</article>`;}
-function home(){state.mode='home';let active=state.surveys.filter(x=>x.status==='active'),rest=state.surveys.filter(x=>x.status!=='active');const offset=(state.archivePage||0)*10;const pages=Math.max(1,Math.ceil(rest.length/10));state.archivePage=Math.min(Math.max(0,state.archivePage||0),pages-1);layout(`<section class="ad-panel"><div class="ad-row" style="justify-content:space-between"><div><h2>Yayındaki Anketler</h2><p class="ad-muted">En fazla 10 aktif anket. 11. anket yayımlanınca en eski aktif anket arşivlenir, geçmiş yanıtları korunur.</p></div><button class="ad-btn" data-act="new">+ Anket Oluştur</button></div><div class="ad-row"><span class="ad-chip ad-live">${active.length}/10 aktif</span><span class="ad-chip">${rest.length} taslak/arşiv</span></div><div class="ad-grid">${active.map(card).join('')||'<div class="ad-empty">Henüz aktif anket yok.</div>'}</div></section><section class="ad-panel" style="margin-top:23px"><h2>Arşiv ve Taslaklar</h2><p class="ad-muted">Eski anketleri burada sakla veya yeniden yayımla. Bağlantı kimliği değişmez.</p><div class="ad-grid">${rest.slice(state.archivePage*10,state.archivePage*10+10).map(card).join('')||'<div class="ad-empty">Arşiv boş.</div>'}</div><div class="ad-row" style="justify-content:space-between;margin-top:18px"><button class="ad-btn-ghost" data-act="archive-prev" ${state.archivePage<=0?'disabled':''}>← Önceki</button><span>${state.archivePage+1} / ${pages}</span><button class="ad-btn-ghost" data-act="archive-next" ${state.archivePage+1>=pages?'disabled':''}>Sonraki →</button></div></section>`);}
+function card(s){
+  const url=link(s.id);
+  return `<article class="ad-survey-card">
+    <div class="ad-row" style="justify-content:space-between">
+      <span class="ad-chip ad-live">● Yayında</span>
+      <span class="ad-small">${stamp(s.updated_at)}</span>
+    </div>
+    <h3>${esc(s.title)}</h3>
+    <div class="ad-kpi">${Number(s.response_count)||0}</div>
+    <div class="ad-stat">Yanıt · ${Number(s.view_count)||0} görüntüleme olayı</div>
+    <div class="ad-row" style="margin-top:16px">
+      <button class="ad-btn-ghost" data-act="edit" data-id="${esc(s.id)}">Düzenle</button>
+      <button class="ad-btn-ghost" data-act="responses" data-id="${esc(s.id)}">Yanıtlar</button>
+    </div>
+    <div class="ad-link" style="margin-top:12px">
+      <code>${esc(url)}</code>
+      <button class="ad-btn-ghost" data-act="copy" data-id="${esc(s.id)}">Kopyala</button>
+      <a target="_blank" rel="noopener" href="${esc(url)}">Aç ↗</a>
+    </div>
+  </article>`;
+}
+function home(){
+  state.mode='home';
+  const bySlot=new Map(state.surveys.map(s=>[Number(s.slot_no),s]));
+  const tiles=Array.from({length:10},(_,i)=>{
+    const slot=i+1;
+    const survey=bySlot.get(slot);
+    return `<div class="ad-slot">
+      <div class="ad-slot-head"><span>${slot}. YUVA</span><small>${survey?'Yayında':'Boş'}</small></div>
+      ${survey?card(survey):'<article class="ad-survey-card ad-empty">Henüz anket yok</article>'}
+    </div>`;
+  }).join('');
+  const localDraft=localStorage.getItem('ihk-local-draft');
+  layout(`<section class="ad-panel">
+    <div class="ad-row" style="justify-content:space-between">
+      <div><h2>10 Sabit Anket Yuvası</h2>
+      <p class="ad-muted">11. anket 1. yuvanın; 12. anket 2. yuvanın; 21. anket yeniden 1. yuvanın yerini alır.
+      Silinen anketin cevapları ve ziyaret kayıtları da veritabanından kaldırılır.</p></div>
+      <button class="ad-btn" data-act="new">+ Yeni Anket</button>
+    </div>
+    <div class="ad-row">
+      <span class="ad-chip ad-live">${state.surveys.length}/10 aktif</span>
+      ${localDraft?'<button class="ad-btn-ghost" data-act="load-local-draft">Kaydedilmiş yerel taslağı aç</button>':''}
+    </div>
+    <div class="ad-grid">${tiles}</div>
+  </section>`);
+}
 const field=(label,key,v,area=false)=>`<label class="ad-field"><span>${label}</span>${area?`<textarea class="ad-textarea" data-bind="${key}">${esc(v)}</textarea>`:`<input class="ad-input" data-bind="${key}" value="${esc(v)}">`}</label>`;
 const qfield=(label,key,v,t='text')=>`<label class="ad-field"><span>${label}</span>${t==='textarea'?`<textarea class="ad-textarea" data-qfield="${key}">${esc(v)}</textarea>`:`<input class="ad-input" type="${t}" data-qfield="${key}" value="${esc(v)}">`}</label>`;
-function editor(){state.mode='edit';let s=state.editor;if(!s)return home();const q=s.questions[state.index]||s.questions[0];if(!q)return;const options=Object.entries(TYPES).map(([k,v])=>`<option value="${k}" ${q.type===k?'selected':''}>${esc(v)}</option>`).join('');layout(`<section class="ad-panel"><div class="ad-row" style="justify-content:space-between;align-items:flex-start"><div><h2>Anket Düzenleyici</h2><p class="ad-muted">21 soru türü · 3D toz geçişleri · Mobil uyum · Zorunlu alan doğrulaması</p></div><span class="ad-chip">${s.status==='active'?'Yayında':'Taslak'}</span></div><div class="ad-columns">${field('Anket başlığı','title',s.title)}${field('Anket açıklaması','description',s.description)}</div><div class="ad-editor"><div><div class="ad-panel"><h3>Sorular (${s.questions.length})</h3>${s.questions.map((x,i)=>`<button data-act="choose-question" data-index="${i}" class="ad-question-tab ${i===state.index?'selected':''}"><span class="ad-qno">${i+1}</span><span class="ad-qtext">${esc(x.text)}</span><small>${esc(TYPES[x.type])}</small></button>`).join('')}<button class="ad-btn" style="width:100%;margin-top:12px" data-act="add-q">+ Soru Ekle</button></div></div><div><div class="ad-panel"><div class="ad-row" style="justify-content:space-between"><h3>${state.index+1}. Soru</h3><span class="ad-chip">${esc(TYPES[q.type])}</span></div><label class="ad-field"><span>Soru türü</span><select class="ad-select" data-qfield="type">${options}</select></label>${qfield('Üst başlık','title',q.title)}${qfield('Soru metni','text',q.text,'textarea')}${qfield('Açıklama','help',q.help,'textarea')}${qfield('İpucu','placeholder',q.placeholder)}<label class="ad-checkbox"><input type="checkbox" data-qfield="required" ${q.required?'checked':''}> Zorunlu soru (*)</label>${OPTION_TYPES.has(q.type)?qfield('Seçenekler · her satıra bir seçenek','options',(q.options||[]).join('\n'),'textarea'):''}${MATRIX_TYPES.has(q.type)?qfield('Matris satırları · her satıra bir ifade','rows',(q.rows||[]).join('\n'),'textarea'):''}${NUMBER_TYPES.has(q.type)?`<div class="ad-columns">${qfield('En küçük','min',q.min,'number')}${qfield('En büyük','max',q.max,'number')}</div>${q.type==='slider'?qfield('Adım','step',q.step,'number'):''}`:''}${q.type==='checkbox'?`<div class="ad-columns">${qfield('Asgari seçim','minSelect',q.minSelect,'number')}${qfield('Azami seçim (0: sınırsız)','maxSelect',q.maxSelect,'number')}</div>`:''}${['radio','checkbox','select','likert'].includes(q.type)?`<label class="ad-checkbox"><input type="checkbox" data-qfield="allowOther" ${q.allowOther?'checked':''}> Diğer seçeneğine izin ver</label>`:''}${q.type==='file'?'<div class="ad-warning">Gerçek dosya yüklemesi için Cloudflare R2 bağlanmalıdır (2 MB dosya sınırı). Kullanım ve kota ayrıca kontrol edilmelidir.</div>':''}<div class="ad-divider"></div><div class="ad-row"><button class="ad-btn-ghost" data-act="up">↑ Yukarı</button><button class="ad-btn-ghost" data-act="down">↓ Aşağı</button><button class="ad-btn-ghost" data-act="duplicate">Çoğalt</button><button class="ad-btn-warn" data-act="delete-q">Sil</button></div></div></div></div><div class="ad-panel" style="margin-top:18px"><h3>Gizlilik ve bitiş mesajı</h3>${field('Yanıt sonrası teşekkür yazısı','thankYou',s.settings.thankYou)}${field('Katılımcıya gösterilecek bilgilendirme','privacyNotice',s.settings.privacyNotice,true)}<label class="ad-checkbox"><input type="checkbox" data-setting="requireConsent" ${s.settings.requireConsent?'checked':''}> Yanıt göndermeden önce onay istensin</label></div><div class="ad-actions-sticky"><div class="ad-row"><button class="ad-btn-ghost" data-act="home">Geri</button><button class="ad-btn-ghost" data-act="preview">3D Önizleme</button></div><div class="ad-row"><button class="ad-btn-ghost" data-act="save">Taslak Kaydet</button><button class="ad-btn" data-act="publish">${s.status==='active'?'Değişiklikleri Yayınla':'Yayınla ve Link Al'}</button></div></div></section>`);}
+function editor(){state.mode='edit';let s=state.editor;if(!s)return home();const q=s.questions[state.index]||s.questions[0];if(!q)return;const options=Object.entries(TYPES).map(([k,v])=>`<option value="${k}" ${q.type===k?'selected':''}>${esc(v)}</option>`).join('');layout(`<section class="ad-panel"><div class="ad-row" style="justify-content:space-between;align-items:flex-start"><div><h2>Anket Düzenleyici</h2><p class="ad-muted">21 soru türü · 3D toz geçişleri · Mobil uyum · Zorunlu alan doğrulaması</p></div><span class="ad-chip">${s.status==='active'?'Yayında':'Taslak'}</span></div><div class="ad-columns">${field('Anket başlığı','title',s.title)}${field('Anket açıklaması','description',s.description)}</div><div class="ad-editor"><div><div class="ad-panel"><h3>Sorular (${s.questions.length})</h3>${s.questions.map((x,i)=>`<button data-act="choose-question" data-index="${i}" class="ad-question-tab ${i===state.index?'selected':''}"><span class="ad-qno">${i+1}</span><span class="ad-qtext">${esc(x.text)}</span><small>${esc(TYPES[x.type])}</small></button>`).join('')}<button class="ad-btn" style="width:100%;margin-top:12px" data-act="add-q">+ Soru Ekle</button></div></div><div><div class="ad-panel"><div class="ad-row" style="justify-content:space-between"><h3>${state.index+1}. Soru</h3><span class="ad-chip">${esc(TYPES[q.type])}</span></div><label class="ad-field"><span>Soru türü</span><select class="ad-select" data-qfield="type">${options}</select></label>${qfield('Üst başlık','title',q.title)}${qfield('Soru metni','text',q.text,'textarea')}${qfield('Açıklama','help',q.help,'textarea')}${qfield('İpucu','placeholder',q.placeholder)}<label class="ad-checkbox"><input type="checkbox" data-qfield="required" ${q.required?'checked':''}> Zorunlu soru (*)</label>${OPTION_TYPES.has(q.type)?qfield('Seçenekler · her satıra bir seçenek','options',(q.options||[]).join('\n'),'textarea'):''}${MATRIX_TYPES.has(q.type)?qfield('Matris satırları · her satıra bir ifade','rows',(q.rows||[]).join('\n'),'textarea'):''}${NUMBER_TYPES.has(q.type)?`<div class="ad-columns">${qfield('En küçük','min',q.min,'number')}${qfield('En büyük','max',q.max,'number')}</div>${q.type==='slider'?qfield('Adım','step',q.step,'number'):''}`:''}${q.type==='checkbox'?`<div class="ad-columns">${qfield('Asgari seçim','minSelect',q.minSelect,'number')}${qfield('Azami seçim (0: sınırsız)','maxSelect',q.maxSelect,'number')}</div>`:''}${['radio','checkbox','select','likert'].includes(q.type)?`<label class="ad-checkbox"><input type="checkbox" data-qfield="allowOther" ${q.allowOther?'checked':''}> Diğer seçeneğine izin ver</label>`:''}${q.type==='file'?'<div class="ad-warning">Bu sürümde dosya yükleme desteklenmiyor. Anket yayımlarken bu soru türünü kullanmayın.</div>':''}<div class="ad-divider"></div><div class="ad-row"><button class="ad-btn-ghost" data-act="up">↑ Yukarı</button><button class="ad-btn-ghost" data-act="down">↓ Aşağı</button><button class="ad-btn-ghost" data-act="duplicate">Çoğalt</button><button class="ad-btn-warn" data-act="delete-q">Sil</button></div></div></div></div><div class="ad-panel" style="margin-top:18px"><h3>Gizlilik ve bitiş mesajı</h3>${field('Yanıt sonrası teşekkür yazısı','thankYou',s.settings.thankYou)}${field('Katılımcıya gösterilecek bilgilendirme','privacyNotice',s.settings.privacyNotice,true)}<label class="ad-checkbox"><input type="checkbox" data-setting="requireConsent" ${s.settings.requireConsent?'checked':''}> Yanıt göndermeden önce onay istensin</label></div><div class="ad-actions-sticky"><div class="ad-row"><button class="ad-btn-ghost" data-act="home">Geri</button><button class="ad-btn-ghost" data-act="preview">3D Önizleme</button></div><div class="ad-row"><button class="ad-btn-ghost" data-act="save">Taslak Kaydet</button><button class="ad-btn" data-act="publish">${s.status==='active'?'Değişiklikleri Yayınla':'Yayınla ve Link Al'}</button></div></div></section>`);}
 function presentSurvey(s,preview=false){state.preview=preview;state.surveyId=preview?'':s.id;state.lastEventStep=-1;state.publicStarted=false;root.hidden=true;ui.style.display='flex';banner.hidden=!preview;SURVEY_CONFIG.questions=structuredClone(s.questions);SURVEY_CONFIG.settings=s.settings||{};SURVEY_CONFIG.surveyId=s.id;const thank=document.querySelector('#success-screen .success-card p');thank.textContent=s.settings?.thankYou||'Katılımınız için teşekkür ederiz.';buildForm();if(!preview)recordEvent('view');}
-async function showPublic(id){root.hidden=false;root.innerHTML='<div class="ad-login-wrap"><div class="ad-panel">3D anket yükleniyor…</div></div>';try{const r=await publicApi('/surveys/'+encodeURIComponent(id));presentSurvey(r.survey);}catch(e){root.innerHTML=`<div class="ad-login-wrap"><div class="ad-panel ad-login"><img src="logo.png" alt="Logo"><h1>Anket açılamıyor</h1><p>${esc(e.message)}</p><p>Anket durmuş, arşivlenmiş veya bağlantı geçersiz olabilir.</p></div></div>`;}}
+async function showPublic(id){root.hidden=false;root.innerHTML='<div class="ad-login-wrap"><div class="ad-panel">3D anket yükleniyor…</div></div>';try{const r=await publicApi('/surveys/'+encodeURIComponent(id));presentSurvey(r.survey);}catch(e){root.innerHTML=`<div class="ad-login-wrap"><div class="ad-panel ad-login"><img src="logo.png" alt="Logo"><h1>Anket açılamıyor</h1><p>${esc(e.message)}</p><p>Bu anket 10 yuvalı döngüde silinmiş ya da bağlantı geçersiz olabilir.</p></div></div>`;}}
 function eventMeta(){return {};}let lastEventAt=0;function recordEvent(type){if(state.preview||!state.surveyId)return;const now=Date.now();if(type==='step'&&now-lastEventAt<500)return;lastEventAt=now;publicApi('/surveys/'+state.surveyId+'/events',{method:'POST',body:JSON.stringify({type})}).catch(()=>{});}
 window.recordLocalSurveyView=step=>{if(step===state.lastEventStep)return;state.lastEventStep=step;if(step===0&&!state.publicStarted){state.publicStarted=true;recordEvent('start');}else if(step>0)recordEvent('step');};
 window.submitSurveyAnswer=async()=>{if(state.preview)return {ok:true,preview:true};if(!state.surveyId)throw Error('Anket ID bulunamadı');if(!state.pendingSubmission)state.pendingSubmission=uid();const result=await publicApi('/surveys/'+state.surveyId+'/responses',{method:'POST',body:JSON.stringify({responseId:state.pendingSubmission,answers:formAnswers,consent:SURVEY_CONFIG.settings?.requireConsent===false?true:!!document.getElementById('survey-consent')?.checked})});state.pendingSubmission='';return result;};
 window.uploadSurveyFile=async()=>{throw Error('Dosya yükleme bu sürümde henüz desteklenmiyor.');};
-async function reload(){const r=await adminApi('/surveys');state.surveys=r.surveys||[];}
+async function reload(){
+  const resp=await fetchSafe(supaUrl()+'/rest/v1/rpc/ihk_slots_list',{
+    method:'POST',
+    headers:{'apikey':pubKey(),'Authorization':'Bearer '+state.token,'Content-Type':'application/json'},
+    body:'{}'
+  });
+  const data=await resp.json().catch(()=>({}));
+  if(!resp.ok)throw Error(data.message||data.error||'10 yuva listesi alınamadı; Supabase SQL düzeltmesini kontrol edin.');
+  state.surveys=Array.isArray(data.surveys)?data.surveys:[];
+}
 async function openAdmin(){await reload();home();}
 async function loadEditor(id){const r=await adminApi('/surveys/'+id);state.editor=r.survey;state.index=0;editor();}
-async function saveEditor(){let s=state.editor;if(!s)throw Error('Anket seçilmedi');const m=s.id?'PUT':'POST',uri='/surveys'+(s.id?'/'+s.id:'');const r=await adminApi(uri,{method:m,body:JSON.stringify(s)});state.editor=r.survey;return r.survey;}
-async function doPublish(){const r=await saveEditor();await adminApi('/surveys/'+r.id+'/publish',{method:'POST'});await reload();return r;}
+async function saveEditor(){
+  const s=state.editor;
+  if(!s)throw Error('Anket seçilmedi');
+  if(!s.id){
+    localStorage.setItem('ihk-local-draft',JSON.stringify(s));
+    return s;
+  }
+  const r=await adminApi('/surveys/'+s.id,{
+    method:'PUT',body:JSON.stringify(s)
+  });
+  state.editor=r.survey;
+  return r.survey;
+}
+async function doPublish(){
+  const s=state.editor;
+  if(!s)throw Error('Anket seçilmedi');
+  let survey;
+  if(s.id){
+    // Güncelleme sırasında anketin kimliği ve yeri değişmez.
+    survey=await saveEditor();
+  }else{
+    // Yalnızca yeni anketlerde SQL atomik silme + ekleme uygular.
+    const resp=await fetchSafe(supaUrl()+'/rest/v1/rpc/ihk_publish_new',{
+      method:'POST',
+      headers:{'apikey':pubKey(),'Authorization':'Bearer '+state.token,'Content-Type':'application/json'},
+      body:JSON.stringify({p_survey:s})
+    });
+    const data=await resp.json().catch(()=>({}));
+    if(!resp.ok)throw Error(data.message||data.error||'Anket yayımlanamadı; SQL fonksiyonunu kontrol edin.');
+    if(!data.survey?.id)throw Error('Supabase yeni anketin bağlantı kimliğini döndürmedi.');
+    survey=data.survey;
+    state.editor=survey;
+    localStorage.removeItem('ihk-local-draft');
+  }
+  await reload();
+  return survey;
+}
 function errorToast(e){notify(e.message||String(e),true);render();}
 function render(){if(state.mode==='login')loginPage();else if(state.mode==='home')home();else if(state.mode==='edit')editor();else if(state.mode==='answers')showAnswers();}
 async function selectAnswers(id,offset=0){state.selected=id;state.responseOffset=offset;const [a,b]=await Promise.all([adminApi('/surveys/'+id+'/responses?limit=100&offset='+offset),adminApi('/surveys/'+id+'/stats')]);state.responses=a.responses;state.responseTotal=a.total;state.stats=b;state.mode='answers';render();}
@@ -94,7 +183,7 @@ async function exportCSV(){if(!state.selected)return;const questions=state.answe
  let lines=[header,...all.map(r=>[r.id,r.created_at,r.client?.device||'',r.client?.browser||'',...questions.map(q=>answerValue(r.answers[q.id]))])];let csv='\ufeff'+lines.map(line=>line.map(csvValue).join(',')).join('\r\n');
  let a=document.createElement('a');const blob=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.href=blob;a.download='tum-yanitlar-'+state.selected+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(blob),10000);
 }
-async function downloadSurveyFile(fileId,name){const r=await fetch(apiBase()+'/api/admin/files/'+encodeURIComponent(fileId),{headers:{Authorization:'Bearer '+state.token}});if(!r.ok)throw Error('Dosya indirilemedi');const blob=URL.createObjectURL(await r.blob());const a=document.createElement('a');a.href=blob;a.download=name||'dosya';a.click();setTimeout(()=>URL.revokeObjectURL(blob),10000);}
+async function downloadSurveyFile(){throw Error('Bu sürümde dosya indirme desteği yok.');}
 window.openSurveyById=showPublic;
 window.initializeApplication=async()=>{ui.style.display='none';root.hidden=false;const s=new URLSearchParams(location.search).get('s');if(s){await showPublic(s);return;}if(!configured()){state.mode='login';notify('Supabase URL ve publishable key eksik. config.js ayarlarını tamamlayın.',true);render();return;}if(state.token){try{await adminApi('/me');await openAdmin();return;}catch{state.token='';sessionStorage.removeItem('ihk-token');}}loginPage();};
 document.getElementById('preview-exit').addEventListener('click',()=>{state.preview=false;banner.hidden=true;root.hidden=false;ui.style.display='none';state.mode='edit';editor();});
@@ -102,15 +191,15 @@ root.addEventListener('submit',async e=>{if(e.target.id!=='login-form')return;e.
 root.addEventListener('input',e=>{let s=state.editor;if(!s)return;let el=e.target,k=el.dataset.bind;if(k){if(k==='thankYou')s.settings.thankYou=el.value;else if(k==='privacyNotice')s.settings.privacyNotice=el.value;else s[k]=el.value;}k=el.dataset.qfield;if(k){let q=s.questions[state.index];if(k==='options'||k==='rows')q[k]=el.value.split('\n').map(x=>x.trim()).filter(Boolean);else if(['min','max','step','minSelect','maxSelect'].includes(k))q[k]=Number(el.value);else q[k]=el.type==='checkbox'?el.checked:el.value;}k=el.dataset.setting;if(k)s.settings[k]=el.checked;});
 root.addEventListener('change',e=>{let el=e.target;if(el.id==='answer-survey'){enterAnswers(el.value).catch(errorToast);return;}if(el.dataset.qfield==='type'){editor();}});
 root.addEventListener('click',async e=>{let el=e.target.closest('[data-act]');if(!el)return;const a=el.dataset.act,id=el.dataset.id,s=state.editor;try{if(a==='logout'){sessionStorage.removeItem('ihk-token');state.token='';state.mode='login';state.message='';return loginPage();}
-if(a==='home'){await reload();state.message='';return home();}if(a==='new'){state.editor=emptySurvey();state.index=0;return editor();}if(a==='choose-question'){state.index=Number(el.dataset.index);return editor();}if(a==='add-q'){if(s.questions.length>=100)throw Error('En fazla 100 soru');s.questions.push(emptyQuestion());state.index=s.questions.length-1;return editor();}if(a==='delete-q'){if(s.questions.length<=1)throw Error('En az bir soru gerekli');s.questions.splice(state.index,1);state.index=Math.max(0,state.index-1);return editor();}if(a==='duplicate'){const clone=structuredClone(s.questions[state.index]);clone.id=emptyQuestion().id;s.questions.splice(state.index+1,0,clone);state.index++;return editor();}
+if(a==='home'){await reload();state.message='';return home();}if(a==='new'){state.editor=emptySurvey();state.index=0;return editor();}if(a==='load-local-draft'){try{const saved=JSON.parse(localStorage.getItem('ihk-local-draft')||'null');state.editor=saved&&Array.isArray(saved.questions)?saved:emptySurvey();state.editor.id='';state.editor.status='draft';state.index=0;return editor();}catch{throw Error('Yerel taslak açılamadı');}}if(a==='choose-question'){state.index=Number(el.dataset.index);return editor();}if(a==='add-q'){if(s.questions.length>=100)throw Error('En fazla 100 soru');s.questions.push(emptyQuestion());state.index=s.questions.length-1;return editor();}if(a==='delete-q'){if(s.questions.length<=1)throw Error('En az bir soru gerekli');s.questions.splice(state.index,1);state.index=Math.max(0,state.index-1);return editor();}if(a==='duplicate'){const clone=structuredClone(s.questions[state.index]);clone.id=emptyQuestion().id;s.questions.splice(state.index+1,0,clone);state.index++;return editor();}
 if(a==='up'||a==='down'){const i=state.index,j=i+(a==='up'?-1:1);if(j<0||j>=s.questions.length)return;[s.questions[i],s.questions[j]]=[s.questions[j],s.questions[i]];state.index=j;return editor();}
 if(a==='preview'){return presentSurvey({...structuredClone(s),id:'preview'},true);}
-if(a==='save'){await saveEditor();notify('Anket kaydedildi. Henüz yayınlanmadı.');return editor();}
-if(a==='publish'){el.disabled=true;const out=await doPublish();notify('Anket gerçekten yayımlandı. Bağlantı: '+link(out.id));return home();}
-if(a==='edit'){return loadEditor(id);}if(a==='republish'){await adminApi('/surveys/'+id+'/publish',{method:'POST'});await reload();notify('Anket yeniden yayımlandı. En eski aktif anket gerekiyorsa arşive alındı.');return home();}
-if(a==='pause'){await adminApi('/surveys/'+id+'/pause',{method:'POST'});await reload();notify('Anket durduruldu, geçmiş yanıtlar saklandı.');return home();}
+if(a==='save'){await saveEditor();notify(s.id?'Yayındaki anket güncellendi. Linki değişmedi.':'Taslak bu tarayıcıda kaydedildi, veritabanında yer kaplamıyor.');return editor();}
+if(a==='publish'){el.disabled=true;const isNew=!s.id;const out=await doPublish();notify((isNew?'Anket yayımlandı; dolu yuvadaki eski anket ve tüm yanıtları silindi.':'Değişiklikler yayımlandı, anketin sırası ve bağlantısı değişmedi.')+' Bağlantı: '+link(out.id));return home();}
+if(a==='edit'){return loadEditor(id);}
+
 if(a==='copy'){try{await navigator.clipboard.writeText(link(id));notify('Anket bağlantısı kopyalandı.');}catch{notify(link(id));}return home();}
-if(a==='archive-prev'){state.archivePage=Math.max(0,(state.archivePage||0)-1);return home();}if(a==='archive-next'){state.archivePage=(state.archivePage||0)+1;return home();}
+
 if(a==='answers'){state.mode='answers';return showAnswers();}if(a==='responses'){return enterAnswers(id);}if(a==='refresh-answers'){return enterAnswers(state.selected);}if(a==='export-csv'){return await exportCSV();}if(a==='download-file'){return await downloadSurveyFile(el.dataset.file,el.dataset.filename);}
 if(a==='prev-page'){return selectAnswers(state.selected,Math.max(0,state.responseOffset-100));}if(a==='next-page'){return selectAnswers(state.selected,state.responseOffset+100);}
 }catch(err){notify(err.message,true);render();}finally{el.disabled=false;}});

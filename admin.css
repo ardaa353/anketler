@@ -75,3 +75,134 @@ textarea.premium-input{min-height:110px;resize:vertical}
 #success-screen .success-card svg{width:80px;height:80px;display:block;margin:0 auto 20px;color:#00e5ff}
 .survey-logo{position:absolute;right:clamp(13px,2.5vw,23px);top:17px;width:clamp(42px,5vw,62px);height:66px;object-fit:contain;z-index:7}
 @media(max-width:640px){#form-container{width:calc(100% - 24px);aspect-ratio:auto;min-height:min(76dvh,650px);max-height:none;padding:clamp(16px,4.5vw,24px);margin:12px auto;border-radius:25px}#form-container>.mt-auto{padding-top:16px}#questions-wrapper{min-height:250px}.question-card h2{font-size:clamp(23px,6.7vw,34px);margin-bottom:20px}#step-indicator{font-size:10px;letter-spacing:.1em}}
+
+
+/* === SABİT 10 YUVA GÖRÜNÜMÜ (YÖNETİCİ PANELİ) === */
+/* admin.css dosyasinin sonuna eklenebilir */
+.ad-slot { min-width: 0; }
+.ad-slot-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 13px; margin-bottom: 8px; border-radius: 12px;
+  background: linear-gradient(90deg, #00e5ff15, #7000ff14);
+  border: 1px solid #86e8ff35;
+  font-weight: 800; color: #a6f5ff; letter-spacing: .08em;
+}
+.ad-slot-head small { color: #b9c5dc; font-size: 11px; font-weight: 500; }
+.ad-slot .ad-survey-card { height: calc(100% - 44px); }
+.ad-survey-card [data-act="pause"],
+.ad-survey-card [data-act="republish"] { display: none !important; }
+
+
+/* === YALNIZCA KATILIMCI ANKETİ: MOBİL GÖRÜNÜM (3D/GSAP DEĞİŞMEZ) === */
+/* SADECE KATILIMCININ ANKET EKRANI / index.html icin */
+@media (max-width: 640px) {
+  #ui-layer {
+    height: 100dvh;
+    overflow-y: auto;
+    padding: max(12px, env(safe-area-inset-top)) 0
+             max(12px, env(safe-area-inset-bottom));
+    align-items: safe center;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #form-container {
+    width: calc(100% - 24px);
+    max-width: 520px;
+    min-height: min(650px, 83dvh);
+    max-height: calc(100dvh - 24px);
+    aspect-ratio: auto;
+    margin: 12px auto;
+    padding: clamp(18px, 5vw, 26px);
+    border-radius: 27px;
+    flex-shrink: 0;
+    border-color: rgba(135, 226, 255, .24);
+    background: linear-gradient(145deg,
+      rgba(27, 38, 66, .64), rgba(11, 11, 26, .81) 65%,
+      rgba(47, 22, 79, .54));
+    box-shadow: 0 22px 65px rgba(0, 0, 0, .75),
+      0 0 32px rgba(0, 229, 255, .09),
+      inset 0 1px 0 rgba(255, 255, 255, .18);
+  }
+
+  #questions-wrapper { flex: 1 1 auto; min-height: 0; }
+  .question-card {
+    min-height: 0;
+    padding: 12px 3px 20px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .question-card h2 {
+    font-size: clamp(23px, 6.1vw, 33px);
+    line-height: 1.22;
+    margin-bottom: 20px;
+    padding-right: 52px;
+    overflow-wrap: anywhere;
+  }
+  .question-card h3 { font-size: 12px; line-height: 1.5; }
+  .question-help { font-size: 14px; line-height: 1.55; }
+
+  .input-wrapper, .premium-input { max-width: 100%; min-width: 0; }
+  .premium-input {
+    font-size: 16px; /* iOS Safari otomatik yakinlastirmasin */
+    min-height: 54px;
+    padding: 14px 16px;
+    border-radius: 15px;
+  }
+  textarea.premium-input { min-height: 110px; resize: vertical; }
+  .premium-radio-label {
+    padding: 15px 16px;
+    min-height: 58px;
+    border-radius: 15px;
+    align-items: center;
+  }
+  .matrix-scroller { max-width: 100%; overflow-x: auto; }
+  .matrix-table { min-width: 520px; }
+  .consent-line { font-size: 13px; line-height: 1.55; }
+
+  #form-container > .mt-auto {
+    gap: 8px;
+    padding-top: 14px;
+    flex: 0 0 auto;
+  }
+  #btn-prev, #btn-next { min-height: 48px; touch-action: manipulation; }
+  #btn-prev { padding: 10px 13px; }
+  #btn-next { padding: 12px 19px; font-size: 14px; }
+  #step-indicator { font-size: 11px; letter-spacing: .08em; }
+
+  .success-card {
+    width: calc(100vw - 28px);
+    max-width: 470px;
+    padding: 30px 20px;
+    border-radius: 25px;
+  }
+}
+
+@media (max-width: 375px) {
+  #form-container { width: calc(100% - 16px); padding: 17px 14px; }
+  .question-card h2 { font-size: 23px; }
+  #btn-next { padding: 11px 15px; }
+  #btn-prev { padding: 9px 10px; }
+}
+
+@media (max-width: 900px) and (orientation: landscape) and (max-height: 500px) {
+  #ui-layer { overflow-y: auto; align-items: flex-start; }
+  #form-container {
+    aspect-ratio: auto;
+    min-height: 440px;
+    max-height: none;
+    margin: 12px auto;
+  }
+}
+
+
+@media (max-width:640px){
+  #ui-layer{padding-left:max(4px,env(safe-area-inset-left));padding-right:max(4px,env(safe-area-inset-right))}
+  #form-container{overflow:hidden}
+  #form-container:not(.dusting-shell){outline:1px solid rgba(0,229,255,.08);outline-offset:2px}
+  #questions-wrapper{min-height:0}
+  #questions-wrapper .question-card.active{overscroll-behavior:contain}
+  .premium-radio-label,.premium-btn{touch-action:manipulation}
+  .premium-radio-label{min-width:0}
+  .premium-radio-label span{font-size:clamp(15px,4.1vw,18px);line-height:1.45}
+  .success-card{max-height:calc(100dvh - 34px);overflow-y:auto}
+}
