@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Ultimate 3D Pro Max Anket</title>
+    <title>İdeal Hukuk Kulübü | Anket Platformu</title>
 
     <!-- Tailwind CSS (Glassmorphism ve UI için) -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -204,7 +204,12 @@
         @media (prefers-reduced-motion: reduce) {
             .orbit, .live-dot { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
         }
+    
     </style>
+    <link rel="stylesheet" href="admin.css">
+    <script src="surveys-data.js"></script>
+    <script src="bridge-config.js"></script>
+    <script src="bridge-client.js"></script>
 </head>
 <body>
 
@@ -229,14 +234,16 @@
             <svg class="w-20 h-20 mx-auto text-[#00e5ff] mb-6 drop-shadow-[0_0_15px_rgba(0,229,255,0.5)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 13l4 4L19 7"></path>
             </svg>
-            <h2 class="text-3xl md:text-4xl font-bold text-white mb-3 tracking-tight">Yanıtınız Kaydedildi</h2>
-            <p class="text-gray-400 font-light text-lg">Katılımınız için teşekkür ederiz.</p>
+            <h2 class="text-3xl md:text-4xl font-bold text-white mb-3 tracking-tight">Anket Gönderildi</h2>
+            <p class="text-gray-400 font-light text-lg">Yanıt yalnızca bu tarayıcıda saklandı. Yöneticiye otomatik gönderilmedi.</p>
+            <button id="save-answer-json" type="button" onclick="window.downloadLastLocalResponse()" style="margin-top:20px;padding:10px 16px;background:#082833;color:#91f7ff;border:1px solid #23cfe8;border-radius:10px;cursor:pointer">Yanıtımı JSON olarak indir</button>
         </div>
     </div>
 
     <!-- UI Katmanı -->
     <div id="ui-layer">
         <div id="form-container" class="glass-card w-[92%] max-w-2xl aspect-[4/3] sm:aspect-[16/10] rounded-[2rem] p-8 md:p-12 relative flex flex-col">
+            <img class="survey-logo" src="logo.png" alt="EBYÜ İdeal Hukuk Kulübü logosu">
             
             <!-- İlerleme Çubuğu -->
             <div class="absolute top-0 left-0 w-full h-1.5 bg-white/5 rounded-t-[2rem] overflow-hidden">
@@ -246,6 +253,8 @@
             <div id="questions-wrapper" class="relative flex-grow mt-2">
                 <!-- JS ile Doldurulacak -->
             </div>
+
+            <div id="survey-alert" role="alert" aria-live="polite"></div>
 
             <!-- Alt Kontroller -->
             <div class="mt-auto pt-6 flex justify-between items-center border-t border-white/5">
@@ -262,12 +271,14 @@
         </div>
     </div>
 
+    <div id="admin-root" class="admin-root" hidden></div>
+    <canvas id="admin-dust" aria-hidden="true"></canvas>
+    <div id="preview-banner" class="preview-banner" hidden><span>ÖNİZLEME — Yanıt saklanmaz</span><button id="preview-exit" type="button">Düzenlemeye dön ✕</button></div>
     <script>
         /** =========================================
          *  1. AYARLAR & GOOGLE FORMS
          *  ========================================= */
         const SURVEY_CONFIG = {
-            formUrl: "https://docs.google.com/forms/d/e/1FAIpQLSc_DUMMY_ID/formResponse",
             questions: [
                 {
                     id: "entry.1", type: "text",
@@ -286,7 +297,7 @@
         };
 
         let currentStep = 0;
-        const totalSteps = SURVEY_CONFIG.questions.length;
+        let totalSteps = SURVEY_CONFIG.questions.length;
         const formAnswers = {};
 
         // Metni harflere bölme (Dust efekti için)
@@ -305,57 +316,139 @@
         const questionsWrapper = document.getElementById('questions-wrapper');
         
         function buildForm() {
+            questionsWrapper.innerHTML = '';
+            currentStep = 0;
+            totalSteps = SURVEY_CONFIG.questions.length;
+            Object.keys(formAnswers).forEach(key => delete formAnswers[key]);
+            document.getElementById('survey-alert').textContent = '';
+            document.getElementById('success-screen').style.opacity = '0';
+            document.getElementById('success-screen').style.pointerEvents = 'none';
+            document.getElementById('form-container').style.display = 'flex';
+            document.getElementById('epic-submit-text').style.display = 'none';
+            document.getElementById('epic-submit-text').classList.remove('epic-impact');
+            btnNext.disabled = false; btnPrev.disabled = false; transitionBusy = false;
+            if (!totalSteps) return;
             SURVEY_CONFIG.questions.forEach((q, index) => {
                 const card = document.createElement('div');
                 card.className = `question-card ${index === 0 ? 'active' : ''}`;
                 card.id = `q-card-${index}`;
-
+                const help = q.help ? `<p class="question-help">${escapeHTML(q.help)}</p>` : '';
+                const required = q.required ? '<span class="required-star" title="Zorunlu"> *</span>' : '';
                 let htmlContent = `
-                    <h3 class="text-xs md:text-sm text-[#00e5ff] uppercase tracking-[0.3em] mb-4 font-bold">
-                        ${splitTextIntoSpans(q.title)}
-                    </h3>
-                    <h2 class="text-3xl md:text-4xl font-bold mb-10 leading-tight tracking-tight">
-                        ${splitTextIntoSpans(q.text)}
-                    </h2>
-                    <div class="input-wrapper w-full max-w-lg">
-                `;
-
-                if (q.type === 'text') {
-                    htmlContent += `<input type="text" class="premium-input" placeholder="Yanıtınızı buraya yazın..." oninput="saveAnswer(${index}, this.value)" autocomplete="off">`;
-                } else if (q.type === 'radio') {
-                    q.options.forEach((opt, optIndex) => {
-                        const radioId = `radio-${index}-${optIndex}`;
-                        htmlContent += `
-                            <div>
-                                <input type="radio" id="${radioId}" name="group-${index}" class="premium-radio-input" value="${opt}" onchange="saveAnswer(${index}, this.value)">
-                                <label for="${radioId}" class="premium-radio-label">
-                                    <div class="w-5 h-5 rounded-full border border-gray-500 mr-4 flex items-center justify-center transition-colors">
-                                        <div class="w-2.5 h-2.5 rounded-full bg-[#00e5ff] scale-0 transition-transform duration-300"></div>
-                                    </div>
-                                    <span class="text-lg font-medium">${opt}</span>
-                                </label>
-                            </div>`;
-                    });
+                    <h3 class="text-xs md:text-sm text-[#00e5ff] uppercase tracking-[0.3em] mb-4 font-bold">${splitTextIntoSpans(q.title || ('SORU '+(index+1)))}</h3>
+                    <h2 class="text-3xl md:text-4xl font-bold mb-10 leading-tight tracking-tight">${splitTextIntoSpans(q.text || q.title)}${required}</h2>
+                    ${help}
+                    <div class="input-wrapper w-full max-w-lg">${renderQuestionInput(q,index)}</div>`;
+                if (index === totalSteps - 1 && SURVEY_CONFIG.settings?.requireConsent) {
+                    const notice=escapeHTML(SURVEY_CONFIG.settings.privacyNotice || 'Yanıtlarınız anket yöneticisi tarafından görüntülenir.');
+                    htmlContent += `<label class="consent-line"><input type="checkbox" id="survey-consent"> <span>${notice} <b>(Onay zorunludur)</b></span></label>`;
                 }
-                htmlContent += `</div>`;
+                htmlContent += '</div>';
                 card.innerHTML = htmlContent;
                 questionsWrapper.appendChild(card);
             });
-
-            // Özel CSS Hook
-            document.head.insertAdjacentHTML('beforeend', `
-                <style>
-                    .premium-radio-input:checked + .premium-radio-label div > div { transform: scale(1); }
-                    .premium-radio-input:checked + .premium-radio-label div { border-color: #00e5ff; }
-                </style>
-            `);
-
             updateUIInfo();
             animateCardIn(0);
         }
-
-        function saveAnswer(stepIndex, value) {
-            formAnswers[SURVEY_CONFIG.questions[stepIndex].id] = value;
+        function renderQuestionInput(q,i) {
+            const esc=escapeHTML;
+            const placeholder=esc(q.placeholder || 'Yanıtınızı buraya yazın...');
+            if(['text','email','number','tel','url','date','time','datetime-local'].includes(q.type)) {
+                return `<input type="${q.type}" class="premium-input" placeholder="${placeholder}" oninput="saveAnswer(${i},this.value)" autocomplete="off">`;
+            }
+            if(q.type==='textarea') return `<textarea class="premium-input" rows="4" placeholder="${placeholder}" oninput="saveAnswer(${i},this.value)"></textarea>`;
+            const opts = q.type==='yesno' ? ['Evet','Hayır'] : (q.options || []);
+            if(['radio','yesno','likert'].includes(q.type)) {
+                let result=opts.map((opt,j)=>{
+                    const rid=`radio-${i}-${j}`;
+                    return `<div><input type="radio" id="${rid}" name="group-${i}" class="premium-radio-input" value="${esc(opt)}" onchange="saveAnswer(${i},this.value)">
+                    <label for="${rid}" class="premium-radio-label"><div class="w-5 h-5 rounded-full border border-gray-500 mr-4 flex items-center justify-center transition-colors"><div class="w-2.5 h-2.5 rounded-full bg-[#00e5ff] scale-0 transition-transform duration-300"></div></div><span class="text-lg font-medium">${esc(opt)}</span></label></div>`;
+                }).join('');
+                if(q.allowOther && q.type!=='yesno')result += `<input class="premium-input other-input" type="text" placeholder="Diğer yanıtınız (isteğe bağlı)" oninput="setOtherAnswer(${i},this.value)">`;
+                return result;
+            }
+            if(q.type==='checkbox') {
+                let result=opts.map((opt,j)=>`<label class="premium-radio-label choice-check"><input type="checkbox" value="${esc(opt)}" onchange="saveMultiAnswer(${i})"> <span>${esc(opt)}</span></label>`).join('');
+                if(q.allowOther) result += `<input class="premium-input other-input" type="text" placeholder="Diğer yanıt" oninput="saveMultiAnswer(${i})">`;
+                return result;
+            }
+            if(q.type==='select') {
+                return `<select class="premium-input" onchange="saveAnswer(${i},this.value==='Diğer'?'':this.value)"><option value="">Seçiniz...</option>${opts.map(o=>`<option value="${esc(o)}">${esc(o)}</option>`).join('')}${q.allowOther?'<option value="Diğer">Diğer</option>':''}</select>${q.allowOther?`<input class="premium-input other-input" placeholder="Diğer yanıtınızı belirtin" style="margin-top:10px" oninput="setOtherAnswer(${i},this.value)">`:''}`;
+            }
+            if(q.type==='rating'||q.type==='scale') {
+                const lo=q.type==='rating'?1:Math.ceil(q.min??1),hi=Math.min(lo+15,Math.floor(q.max??5));
+                return `<div class="numeric-choices">${Array.from({length:Math.max(1,hi-lo+1)},(_,j)=>`<button type="button" class="num-choice" onclick="chooseNumeric(${i},${lo+j},this)">${q.type==='rating'?'★ ':''}${lo+j}</button>`).join('')}</div>`;
+            }
+            if(q.type==='slider') {
+                const lo=+q.min||0, hi=+q.max||10,step=+q.step||1;
+                return `<div class="slider-view"><span>${lo}</span><input type="range" min="${lo}" max="${hi}" step="${step}" value="${lo}" oninput="saveAnswer(${i},this.value);this.parentElement.querySelector('output').textContent=this.value"><span>${hi}</span><output>Seçiniz</output></div>`;
+            }
+            if(q.type==='ranking') {
+                return `<div class="ranking-list" id="rank-${i}">${opts.map((o,j)=>`<div class="rank-row" data-item="${esc(o)}"><span class="rank-index">${j+1}</span><strong>${esc(o)}</strong><div><button type="button" onclick="moveRank(${i},${j},-1)" aria-label="Yukarı taşı">↑</button><button type="button" onclick="moveRank(${i},${j},1)" aria-label="Aşağı taşı">↓</button></div></div>`).join('')}</div><button type="button" class="small-accent" onclick="recordRanking(${i})">Sıralamayı onayla</button>`;
+            }
+            if(['matrix','matrix-multi'].includes(q.type)) {
+                const rows=q.rows||[];
+                return `<div class="matrix-scroller"><table class="matrix-table"><thead><tr><th>İfade</th>${opts.map(o=>`<th>${esc(o)}</th>`).join('')}</tr></thead><tbody>${rows.map((r,j)=>`<tr><th>${esc(r)}</th>${opts.map((o,k)=>`<td><input type="${q.type==='matrix'?'radio':'checkbox'}" name="matrix-${i}-${j}" value="${esc(o)}" data-row="${esc(r)}" onchange="saveMatrix(${i})" aria-label="${esc(r)}: ${esc(o)}"></td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+            }
+            if(q.type==='file')return `<input type="file" class="premium-input" accept=".png,.jpg,.jpeg,.webp,.pdf,.txt,.docx" onchange="uploadAnswerFile(${i},this)"><small class="file-status">PNG, JPG, WEBP, PDF, TXT veya DOCX · En fazla 5 MB · Dosyanın kendisi gönderilmez!</small>`;
+            return '<p>Desteklenmeyen soru türü.</p>';
+        }
+        function saveAnswer(index, value) { formAnswers[SURVEY_CONFIG.questions[index].id] = value; }
+        function saveMultiAnswer(index){
+            const card=document.getElementById(`q-card-${index}`),q=SURVEY_CONFIG.questions[index];
+            const vals=Array.from(card.querySelectorAll('input[type="checkbox"]:checked')).filter(e=>!e.id).map(e=>e.value);
+            const other=card.querySelector('.other-input');if(other?.value.trim()) vals.push('Diğer: '+other.value.trim());
+            saveAnswer(index,vals);
+        }
+        function setOtherAnswer(index,value){
+            const q=SURVEY_CONFIG.questions[index];
+            if(q.type==='checkbox')return saveMultiAnswer(index);
+            const card=document.getElementById(`q-card-${index}`);
+            if(value.trim()){
+                card.querySelectorAll('input[type="radio"]').forEach(e=>e.checked=false);
+                if(q.type==='select')card.querySelector('select').value='Diğer';
+                saveAnswer(index,'Diğer: '+value.trim());
+            }else{const sel=card.querySelector('select');saveAnswer(index,sel&&sel.value!=='Diğer'?sel.value:'');}
+        }
+        function chooseNumeric(index,value,el){
+            el.parentElement.querySelectorAll('.num-choice').forEach(btn=>btn.classList.toggle('selected',btn===el));
+            saveAnswer(index,String(value));
+        }
+        function saveMatrix(index){
+            const q=SURVEY_CONFIG.questions[index],card=document.getElementById(`q-card-${index}`),out={};
+            for(const row of q.rows||[]){
+                const selected=Array.from(card.querySelectorAll('input[data-row]')).filter(el=>el.dataset.row===row&&el.checked).map(el=>el.value);
+                if(selected.length)out[row]=q.type==='matrix'?selected[0]:selected;
+            }
+            saveAnswer(index,out);
+        }
+        function moveRank(index,from,direction){
+            const box=document.getElementById(`rank-${index}`),rows=Array.from(box.children),to=from+direction;
+            if(to<0||to>=rows.length)return;
+            const item=rows[from];if(direction===-1)box.insertBefore(item,rows[to]);else box.insertBefore(rows[to],item);
+            Array.from(box.children).forEach((row,j)=>{row.querySelector('.rank-index').textContent=j+1;row.querySelectorAll('button')[0].setAttribute('onclick',`moveRank(${index},${j},-1)`);row.querySelectorAll('button')[1].setAttribute('onclick',`moveRank(${index},${j},1)`);});
+            recordRanking(index);
+        }
+        function recordRanking(index){saveAnswer(index,Array.from(document.querySelectorAll(`#rank-${index} .rank-row`)).map(e=>e.dataset.item));}
+        let fileUploadPending=0;
+        function uploadAnswerFile(index,input){
+            const label=input.parentElement.querySelector('.file-status'),f=input.files?.[0];
+            if(!f)return;
+            if(f.size>5*1024*1024){label.textContent='Dosya 5 MB sınırını aşıyor.';input.value='';return;}
+            saveAnswer(index,`${f.name} (${Math.ceil(f.size/1024)} KB) — yalnızca dosya bilgisi`);
+            label.textContent='⚠ Dosyanın içeriği kaydedilmez veya gönderilmez. Yalnızca dosya adı saklanır.';
+        }
+        function validationError(){
+            const q=SURVEY_CONFIG.questions[currentStep],a=formAnswers[q.id];
+            if(q.required && (a===undefined||a===''||a===null||Array.isArray(a)&&a.length===0||typeof a==='object'&&!Object.keys(a).length))return 'Bu soru zorunludur.';
+            if(q.required&&['matrix','matrix-multi'].includes(q.type)&&q.rows.some(r=>!a?.[r]?.length))return 'Lütfen matrisin bütün satırlarını doldurun.';
+            if(q.type==='checkbox'&&Array.isArray(a)&&((q.minSelect&&a.length<q.minSelect)||(q.maxSelect&&a.length>q.maxSelect)))return `En az ${q.minSelect||0}, en fazla ${q.maxSelect||'sınırsız'} seçim yapabilirsiniz.`;
+            if(fileUploadPending)return 'Dosyanın hazırlanması tamamlanmalı.';
+            if(currentStep===totalSteps-1 && SURVEY_CONFIG.settings?.requireConsent && !document.getElementById('survey-consent')?.checked)return 'Devam etmek için bilgilendirme/onay kutusunu işaretleyin.';
+            return '';
+        }
+        function showSurveyError(msg){
+            const box=document.getElementById('survey-alert');box.textContent=msg;box.classList.toggle('visible',!!msg);
         }
 
         /** =========================================
@@ -551,6 +644,18 @@
                     textTargetsForElement(pts,el);
                 }
             }
+            // Logo da aynı mikro-toz alanına dahil: şeffaf pikseller atlanır.
+            const logo=formContainer.querySelector('.survey-logo');
+            if(logo&&logo.complete&&logo.naturalWidth){
+                const lr=logo.getBoundingClientRect(),cw=Math.max(1,Math.floor(lr.width)),ch=Math.max(1,Math.floor(lr.height));
+                const off=document.createElement('canvas');off.width=cw;off.height=ch;
+                const c=off.getContext('2d',{willReadFrequently:true});
+                c.drawImage(logo,0,0,cw,ch);
+                const bits=c.getImageData(0,0,cw,ch).data;
+                for(let y=0;y<ch;y+=2.4)for(let x=0;x<cw;x+=2.4){
+                    if(bits[(Math.floor(y)*cw+Math.floor(x))*4+3]>115)pts.push({x:lr.left+x,y:lr.top+y,r:.38+Math.random()*.24});
+                }
+            }
             const indicator=formContainer.querySelector('#step-indicator');
             if(indicator) textTargetsForElement(pts,indicator);
             const footer=formContainer.querySelector(':scope > .mt-auto');
@@ -562,6 +667,7 @@
         }
         function getStructureHideElements(formContainer, card) {
             const list=[...card.querySelectorAll('.input-wrapper')];
+            const logo=formContainer.querySelector('.survey-logo');if(logo)list.push(logo);
             const footer=formContainer.querySelector(':scope > .mt-auto');
             const progress=formContainer.querySelector(':scope > .absolute');
             if(footer) list.push(footer); if(progress) list.push(progress);
@@ -707,6 +813,7 @@
         function updateUIInfo() {
             document.getElementById('step-indicator').innerText = `ADIM ${currentStep + 1} / ${totalSteps}`;
             document.getElementById('progress-bar').style.width = `${((currentStep + 1) / totalSteps) * 100}%`;
+            if(window.recordLocalSurveyView && window.APP_STATE?.surveyId && !window.APP_STATE.preview)window.recordLocalSurveyView(currentStep);
             
             btnPrev.style.display = currentStep === 0 ? 'none' : 'block';
 
@@ -721,6 +828,7 @@
 
         function changeStep(direction) {
             if (transitionBusy) return;
+            if (direction > 0) {const err=validationError(); if(err){showSurveyError(err);return;}showSurveyError('');}
             if (direction > 0 && currentStep === totalSteps - 1) { submitEpicSequence(); return; }
             const next = currentStep + direction;
             if (next < 0 || next >= totalSteps) return;
@@ -739,86 +847,76 @@
         /** =========================================
          *  4. THE EPIC SUBMIT (Shatter & Explosion)
          *  ========================================= */
+        // GERÇEK 3D HARF TÜNELİ: Yazı yaklaşır; kamera gliflerin arasından geçerken
+        // harfler farklı Z derinliklerine savrulur, sonra mevcut mikro-toz başarıya dönüşür.
         function submitEpicSequence() {
             if (transitionBusy) return;
-            transitionBusy = true;
-            const formContainer = document.getElementById('form-container');
-            const epicText = document.getElementById('epic-submit-text');
-            btnNext.disabled = true;
-            btnPrev.disabled = true;
-
-            // Başlangıç karelerini temizle; tekrar tıklamada önceki animasyondan iz kalmasın.
-            gsap.killTweensOf([formContainer, epicText]);
-            epicText.style.display = 'block';
-            gsap.set(epicText, {
-                opacity: 0, z: -2200, scale: .16, rotationX: -5, rotationY: 2,
-                transformOrigin: '50% 50%', filter: 'blur(18px)', letterSpacing: '.18em'
-            });
-
-            // Kart hafifçe derine çekilip kaybolurken başlık aynı anda yaklaşır.
-            // Eski 3 parçalı timeline kaldırıldı: ara duraklama/yeniden hızlanma yok.
-            gsap.to(formContainer, {
-                rotationX: 10, rotationY: -4, z: -520, scale: .94,
-                opacity: 0, filter: 'blur(5px)', duration: reduceMotion ? .01 : .62,
-                ease: 'power2.in', onComplete: () => { formContainer.style.display = 'none'; }
-            });
-
-            if (reduceMotion) {
-                gsap.set(epicText, { opacity: 1, z: 0, scale: 1, rotationX: 0, rotationY: 0, filter: 'none', letterSpacing: '-.02em' });
-                requestAnimationFrame(impactAndSend);
-                return;
+            const err=validationError();if(err){showSurveyError(err);return;}
+            transitionBusy=true;
+            const formContainer=document.getElementById('form-container');
+            const epicText=document.getElementById('epic-submit-text');
+            const message='GÖNDERİLİYOR';
+            epicText.innerHTML=Array.from(message).map(ch=>`<span class="portal-letter">${ch}</span>`).join('');
+            epicText.classList.remove('epic-impact');
+            btnNext.disabled=true;btnPrev.disabled=true;
+            window.sendPromise = window.submitSurveyAnswer();
+            // A rejected Promise is handled immediately, even while the fly-through runs.
+            window.sendPromise.catch(()=>{});
+            gsap.killTweensOf([formContainer,epicText]);
+            epicText.style.display='block';epicText.style.visibility='visible';
+            const letters=Array.from(epicText.querySelectorAll('.portal-letter'));
+            gsap.set(letters,{clearProps:'all',transformOrigin:'50% 50%'});
+            gsap.set(epicText,{opacity:0,z:-1800,scale:.22,rotationX:-7,rotationY:3,
+                xPercent:-50,yPercent:-50,x:0,y:0,filter:'blur(12px)',letterSpacing:'.11em'});
+            gsap.to(formContainer,{rotationX:10,rotationY:-4,z:-520,scale:.94,
+                opacity:0,filter:'blur(5px)',duration:reduceMotion?.01:.57,
+                ease:'power2.in',onComplete:()=>{formContainer.style.display='none';}});
+            if(reduceMotion){
+                gsap.set(epicText,{opacity:1,z:0,scale:1,rotationX:0,rotationY:0,filter:'none'});
+                finishValidatedSend();return;
             }
-
-            // Tek ve kesintisiz 3D hareket: uzaktan gelir, son bölümde hızlanarak kameraya ulaşır.
-            // Opaklık ve netlik ayrı özelliklerde eşzamanlı ilerlediği için başlık bir anda belirmez.
-            const flight = gsap.timeline({ onComplete: impactAndSend });
-            flight.to(epicText, {
-                z: 875, scale: 1.24, rotationX: -2.4, rotationY: 1.7,
-                duration: 1.48, ease: 'expo.in'
-            }, 0)
-            .to(epicText, {
-                opacity: 1, duration: .46, ease: 'power1.out'
-            }, .08)
-            .to(epicText, {
-                filter: 'blur(0px)', letterSpacing: '-.02em',
-                duration: .68, ease: 'power2.out'
-            }, 0);
+            const width=innerWidth,height=innerHeight;
+            const middle=(letters.length-1)/2;
+            const timeline=gsap.timeline({onComplete:finishValidatedSend});
+            timeline.to(epicText,{opacity:1,duration:.4,ease:'sine.out'},0)
+              .to(epicText,{z:550,scale:1.3,rotationX:0,rotationY:0,
+                  filter:'blur(0px)',letterSpacing:'-.025em',duration:1.45,ease:'power3.in'},0)
+              .call(()=>triggerWarpSpeed(1050,22),null,.88)
+              .to(epicText,{z:950,scale:1.72,duration:.24,ease:'power4.in'},1.45)
+              .to(letters,{x:(i)=>((i-middle)*width*.20),y:(i)=>(i%2?-1:1)*height*(.25+Math.random()*.38),
+                  z:(i)=>850+Math.abs(i-middle)*145,rotationY:(i)=>i%2?-48:48,rotationX:(i)=>i%2?-28:28,
+                  opacity:.15,filter:'blur(8px)',duration:.63,stagger:{from:'center',amount:.14},ease:'power4.in'},1.51)
+              .call(()=>{
+                  const flash=document.getElementById('impact-flash');
+                  const ring=document.getElementById('impact-ring');
+                  gsap.fromTo(flash,{opacity:0},{opacity:.92,duration:.12,yoyo:true,repeat:1});
+                  gsap.fromTo(ring,{scale:.05,opacity:1},{scale:17,opacity:0,duration:.6,ease:'power3.out'});
+              },null,1.84);
         }
-
-        function impactAndSend() {
-            const epicText = document.getElementById('epic-submit-text');
-            const flash = document.getElementById('impact-flash');
-            const ring = document.getElementById('impact-ring');
-            const launchDust = () => {
-                // Çarpışma hissinden hemen sonra aynı mikro-tozlar başarı kartına akar.
-                triggerWarpSpeed(2050, 20);
-                startSuccessDustMorph();
-                sendData();
-            };
-
-            if (epicText) {
-                gsap.killTweensOf(epicText);
-                epicText.style.display = 'block';
-                epicText.style.visibility = 'visible';
-                epicText.classList.add('epic-impact');
-                gsap.set(epicText, { opacity: 1 });
+        function finishValidatedSend(){
+            window.sendPromise.then(()=>impactAndSend()).catch(e=>{
+                const epic=document.getElementById('epic-submit-text');
+                epic.style.display='none';epic.innerText='GÖNDERİLİYOR';
+                const panel=document.getElementById('form-container');panel.style.display='flex';
+                gsap.set(panel,{clearProps:'all'});gsap.set(panel,{opacity:1});
+                btnNext.disabled=false;btnPrev.disabled=false;transitionBusy=false;
+                showSurveyError('Yanıt gönderilemedi: '+e.message+' Lütfen yeniden deneyin.');
+            });
+        }
+        function impactAndSend(){
+            const epic=document.getElementById('epic-submit-text');
+            gsap.killTweensOf(epic);
+            epic.innerText='GÖNDERİLİYOR';
+            epic.style.display='block';epic.style.visibility='visible';
+            epic.classList.add('epic-impact');
+            gsap.set(epic,{opacity:0,z:850,scale:1.4,xPercent:-50,yPercent:-50,x:0,y:0,
+                rotationX:0,rotationY:0,filter:'brightness(1.6)',letterSpacing:'-.02em'});
+            if(!reduceMotion){
+                gsap.fromTo(epic,{scale:1.4,filter:'brightness(3.2)'},{scale:1.85,filter:'brightness(2)',duration:.17,ease:'power4.in'});
+                triggerWarpSpeed(2050,20);
             }
-            if (reduceMotion || !epicText) {
-                launchDust();
-                return;
-            }
-
-            // Son duruşta renk patlar, yazı birkaç kare titreşir ve parlak bir şok halkası açılır.
-            gsap.killTweensOf([flash, ring]);
-            if (flash) gsap.fromTo(flash, { opacity: 0 }, { opacity: .82, duration: .075, yoyo: true, repeat: 1, ease: 'power2.out' });
-            if (ring) gsap.fromTo(ring,
-                { scale: .12, opacity: .98, rotation: -8 },
-                { scale: 14, opacity: 0, rotation: 18, duration: .58, ease: 'power3.out', transformOrigin: '50% 50%' }
-            );
-            gsap.timeline({ onComplete: launchDust })
-                .to(epicText, { scale: 1.34, rotationZ: .8, filter: 'brightness(2.2) saturate(1.8)', duration: .085, ease: 'power4.out' })
-                .to(epicText, { x: 7, y: -2, rotationZ: -1.6, scale: 1.27, duration: .045, repeat: 3, yoyo: true, ease: 'none' })
-                .to(epicText, { x: 0, y: 0, rotationZ: 0, scale: 1.52, filter: 'brightness(2.5) saturate(1.9)', duration: .105, ease: 'power4.in' });
+            // Existing pixel-mask particle morph intentionally remains untouched.
+            startSuccessDustMorph();
         }
 
         /*
@@ -900,9 +998,9 @@
                 c.textAlign='center'; c.textBaseline='middle'; c.fillStyle='#fff';
                 const titleSize = w < 500 ? 21 : 30;
                 c.font = `700 ${titleSize}px Inter, Arial, sans-serif`;
-                c.fillText('Yanıtınız Kaydedildi', w/2, top+cardH*.53, cardW-28);
+                c.fillText('Anket Gönderildi', w/2, top+cardH*.53, cardW-28);
                 c.fillStyle='#fff'; c.font=`300 ${w<500?13:17}px Inter, Arial, sans-serif`;
-                c.fillText('Katılımınız için teşekkür ederiz.', w/2, top+cardH*.68, cardW-26);
+                c.fillText('Yanıt bu cihazda saklandı.', w/2, top+cardH*.68, cardW-26);
             }, w < 700 ? 1.7 : 1.5);
 
             // Kaynak ve hedef maskelerinden aynı sayıda zerre seçilir; her tanecik ~1 px.
@@ -956,12 +1054,6 @@
             // gizlenir. Böylece fade/scale tween'i araya girip patlamayı büyük parçalara ayırmaz.
             frame(started);
             if(epic) epic.style.visibility='hidden';
-        }
-
-        function sendData() {
-            const formData = new FormData();
-            for (const key in formAnswers) formData.append(key, formAnswers[key]);
-            fetch(SURVEY_CONFIG.formUrl, { method: 'POST', mode: 'no-cors', body: formData }).catch(e => console.log(e));
         }
 
         /** =========================================
@@ -1213,9 +1305,10 @@
         }
 
         window.onload = () => {
-            buildForm();
             animate();
+            initializeApplication();
         };
     </script>
+    <script src="app.js"></script>
 </body>
 </html>
