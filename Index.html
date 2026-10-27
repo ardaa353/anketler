@@ -40,12 +40,6 @@
             perspective: 2000px;
         }
 
-        /* URL oluşturucu: mevcut neon/cam tasarım diliyle uyumlu */
-        #url-setup { width: min(92%, 680px); padding: clamp(22px, 5vw, 42px); pointer-events: auto; }
-        #url-setup input { width:100%; background:rgba(0,0,0,.5); border:1px solid rgba(255,255,255,.18); padding:1rem; border-radius:1rem; color:#fff; font-size:16px; outline:none; }
-        #url-setup input:focus { border-color:#00e5ff; box-shadow:0 0 0 3px rgba(0,229,255,.12); }
-        #generated-url { overflow-wrap:anywhere; color:#00e5ff; font-size:.88rem; }
-        #setup-status { min-height:1.25rem; }
         /* Glassmorphism Ana Kart */
         .glass-card {
             pointer-events: auto;
@@ -235,34 +229,13 @@
             <svg class="w-20 h-20 mx-auto text-[#00e5ff] mb-6 drop-shadow-[0_0_15px_rgba(0,229,255,0.5)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 13l4 4L19 7"></path>
             </svg>
-            <h2 class="text-3xl md:text-4xl font-bold text-white mb-3 tracking-tight" id="success-title">Yanıt gönderildi</h2>
-            <p class="text-gray-400 font-light text-lg" id="success-message">Yanıtınız Google Forms'a iletildi.</p>
+            <h2 class="text-3xl md:text-4xl font-bold text-white mb-3 tracking-tight">Yanıtınız Kaydedildi</h2>
+            <p class="text-gray-400 font-light text-lg">Katılımınız için teşekkür ederiz.</p>
         </div>
     </div>
 
     <!-- UI Katmanı -->
     <div id="ui-layer">
-        <section id="url-setup" class="glass-card rounded-[2rem]" aria-labelledby="setup-title">
-            <p class="text-xs text-[#00e5ff] uppercase tracking-[0.3em] font-bold mb-4">ULTIMATE 3D · BAĞLANTI OLUŞTURUCU</p>
-            <h1 id="setup-title" class="text-3xl md:text-4xl font-black tracking-tight mb-4">Anket bağlantını hazırla</h1>
-            <p class="text-gray-300 mb-6 leading-relaxed">Google Forms bağlantısını girerek bu tasarımın açılacağı bir paylaşım URL'si oluşturabilirsin.</p>
-            <label for="google-form-url" class="block text-sm text-gray-300 mb-2">Google Forms bağlantısı</label>
-            <input id="google-form-url" type="url" inputmode="url" placeholder="https://docs.google.com/forms/d/e/.../viewform" autocomplete="url" />
-            <button id="create-url-btn" type="button" class="premium-btn mt-4 w-full">URL OLUŞTUR</button>
-            <div id="setup-status" class="text-sm text-gray-300 mt-4" role="status" aria-live="polite"></div>
-            <div id="generated-url-wrap" class="hidden mt-3">
-                <p class="text-xs text-gray-400 mb-2">Oluşturulan paylaşım bağlantısı</p>
-                <p id="generated-url" class="mb-4"></p>
-                <div class="flex flex-wrap gap-3">
-                    <button id="copy-url-btn" type="button" class="premium-btn">BAĞLANTIYI KOPYALA</button>
-                    <button id="preview-url-btn" type="button" class="premium-btn">ÖNİZLEMEYİ AÇ</button>
-                </div>
-            </div>
-            <div class="mt-6 border-t border-white/10 pt-4 text-xs text-gray-400 leading-relaxed">
-                Gerçek senkronizasyon için bu sayfa Google Apps Script web uygulaması olarak yayımlanmalıdır. Google hesabı alanı resmi Google hesap seçicisi değildir; e-posta bildirimi içindir.
-            </div>
-        </section>
-        <div id="account-strip" class="hidden w-[92%] max-w-2xl mb-3 rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm text-gray-300">Katılımcı e-postası (isteğe bağlı; Google hesabı doğrulaması değildir): <input id="respondent-email" type="email" placeholder="E-posta (isteğe bağlı; Google hesap seçici değildir)" class="premium-input mt-2" style="min-height:42px;padding:.6rem 1rem" /></div>
         <div id="form-container" class="glass-card w-[92%] max-w-2xl aspect-[4/3] sm:aspect-[16/10] rounded-[2rem] p-8 md:p-12 relative flex flex-col">
             
             <!-- İlerleme Çubuğu -->
@@ -293,18 +266,27 @@
         /** =========================================
          *  1. AYARLAR & GOOGLE FORMS
          *  ========================================= */
-        const params = new URLSearchParams(window.location.search);
-        const sharedToken = params.get('token');
-        const setupPanel = document.getElementById('url-setup');
-        const surveyContainer = document.getElementById('form-container');
-        const accountStrip = document.getElementById('account-strip');
-        setupPanel.style.display = sharedToken ? 'none' : 'block';
-        surveyContainer.style.display = sharedToken ? 'flex' : 'none';
-        accountStrip.classList.toggle('hidden', !sharedToken);
+        const SURVEY_CONFIG = {
+            formUrl: "https://docs.google.com/forms/d/e/1FAIpQLSc_DUMMY_ID/formResponse",
+            questions: [
+                {
+                    id: "entry.1", type: "text",
+                    title: "Hoş Geldiniz", text: "Deneyime başlamak için adınızı girin."
+                },
+                {
+                    id: "entry.2", type: "radio",
+                    title: "Arayüz Tasarımı", text: "Bu Pro Max 3D arayüzü nasıl buldunuz?",
+                    options: ["Tek kelimeyle kusursuz", "Çok etkileyici", "Geliştirilebilir"]
+                },
+                {
+                    id: "entry.3", type: "text",
+                    title: "Son Düşünceler", text: "Sistem hakkındaki ek geri bildiriminiz nedir?"
+                }
+            ]
+        };
 
-        const SURVEY_CONFIG = { formUrl: '', token: sharedToken || '', questions: [] };
         let currentStep = 0;
-        let totalSteps = 0;
+        const totalSteps = SURVEY_CONFIG.questions.length;
         const formAnswers = {};
 
         // Metni harflere bölme (Dust efekti için)
@@ -323,38 +305,53 @@
         const questionsWrapper = document.getElementById('questions-wrapper');
         
         function buildForm() {
-            questionsWrapper.innerHTML = '';
             SURVEY_CONFIG.questions.forEach((q, index) => {
                 const card = document.createElement('div');
                 card.className = `question-card ${index === 0 ? 'active' : ''}`;
                 card.id = `q-card-${index}`;
-                let htmlContent = `<h3 class="text-xs md:text-sm text-[#00e5ff] uppercase tracking-[0.3em] mb-4 font-bold">${splitTextIntoSpans(q.title || 'SORU')}</h3><h2 class="text-3xl md:text-4xl font-bold mb-10 leading-tight tracking-tight">${splitTextIntoSpans(q.text || '')}</h2><div class="input-wrapper w-full max-w-lg">`;
-                const name = `answer-${index}`;
-                if (['text','paragraph'].includes(q.type)) {
-                    const tag = q.type === 'paragraph' ? 'textarea' : 'input';
-                    htmlContent += tag === 'input' ? `<input type="text" class="premium-input" placeholder="Yanıtınızı buraya yazın..." oninput="saveAnswer(${index}, this.value)" autocomplete="off">` : `<textarea class="premium-input" rows="4" placeholder="Yanıtınızı buraya yazın..." oninput="saveAnswer(${index}, this.value)"></textarea>`;
-                } else if (['radio','select'].includes(q.type)) {
-                    (q.options || []).forEach((opt, oi) => { const rid=`radio-${index}-${oi}`; htmlContent += `<div><input type="radio" id="${rid}" name="${name}" class="premium-radio-input" value="${escapeHTML(opt)}" onchange="saveAnswer(${index}, this.value)"><label for="${rid}" class="premium-radio-label"><div class="w-5 h-5 rounded-full border border-gray-500 mr-4 flex items-center justify-center transition-colors"><div class="w-2.5 h-2.5 rounded-full bg-[#00e5ff] scale-0 transition-transform duration-300"></div></div><span class="text-lg font-medium">${escapeHTML(opt)}</span></label></div>`; });
-                } else if (q.type === 'checkbox') {
-                    (q.options || []).forEach((opt, oi) => { const rid=`check-${index}-${oi}`; htmlContent += `<label class="premium-radio-label"><input type="checkbox" id="${rid}" value="${escapeHTML(opt)}" onchange="saveCheckboxAnswer(${index})" class="mr-3"><span class="text-lg font-medium">${escapeHTML(opt)}</span></label>`; });
-                } else if (q.type === 'scale') {
-                    htmlContent += `<div class="flex flex-wrap gap-3">`; for(let n=q.lower;n<=q.upper;n++) htmlContent += `<label class="premium-radio-label"><input type="radio" name="${name}" value="${n}" onchange="saveAnswer(${index}, this.value)" class="mr-2">${n}</label>`; htmlContent += `</div>`;
-                } else if (q.type === 'date' || q.type === 'time') {
-                    htmlContent += `<input type="${q.type}" class="premium-input" onchange="saveAnswer(${index}, this.value)">`;
-                } else {
-                    htmlContent += `<p class="text-gray-300">Bu soru türü özel arayüzde desteklenmiyor. Lütfen form sahibinden soruyu standart metin/çoktan seçmeli biçime çevirmesini isteyin.</p><input type="text" class="premium-input" placeholder="Yanıtınız" oninput="saveAnswer(${index}, this.value)">`;
+
+                let htmlContent = `
+                    <h3 class="text-xs md:text-sm text-[#00e5ff] uppercase tracking-[0.3em] mb-4 font-bold">
+                        ${splitTextIntoSpans(q.title)}
+                    </h3>
+                    <h2 class="text-3xl md:text-4xl font-bold mb-10 leading-tight tracking-tight">
+                        ${splitTextIntoSpans(q.text)}
+                    </h2>
+                    <div class="input-wrapper w-full max-w-lg">
+                `;
+
+                if (q.type === 'text') {
+                    htmlContent += `<input type="text" class="premium-input" placeholder="Yanıtınızı buraya yazın..." oninput="saveAnswer(${index}, this.value)" autocomplete="off">`;
+                } else if (q.type === 'radio') {
+                    q.options.forEach((opt, optIndex) => {
+                        const radioId = `radio-${index}-${optIndex}`;
+                        htmlContent += `
+                            <div>
+                                <input type="radio" id="${radioId}" name="group-${index}" class="premium-radio-input" value="${opt}" onchange="saveAnswer(${index}, this.value)">
+                                <label for="${radioId}" class="premium-radio-label">
+                                    <div class="w-5 h-5 rounded-full border border-gray-500 mr-4 flex items-center justify-center transition-colors">
+                                        <div class="w-2.5 h-2.5 rounded-full bg-[#00e5ff] scale-0 transition-transform duration-300"></div>
+                                    </div>
+                                    <span class="text-lg font-medium">${opt}</span>
+                                </label>
+                            </div>`;
+                    });
                 }
-                htmlContent += `</div>`; card.innerHTML = htmlContent; questionsWrapper.appendChild(card);
+                htmlContent += `</div>`;
+                card.innerHTML = htmlContent;
+                questionsWrapper.appendChild(card);
             });
-            document.head.insertAdjacentHTML('beforeend', `<style>.premium-radio-input:checked + .premium-radio-label div > div { transform: scale(1); }.premium-radio-input:checked + .premium-radio-label div { border-color: #00e5ff; }</style>`);
-            totalSteps = SURVEY_CONFIG.questions.length;
-            currentStep = 0;
+
+            // Özel CSS Hook
+            document.head.insertAdjacentHTML('beforeend', `
+                <style>
+                    .premium-radio-input:checked + .premium-radio-label div > div { transform: scale(1); }
+                    .premium-radio-input:checked + .premium-radio-label div { border-color: #00e5ff; }
+                </style>
+            `);
+
             updateUIInfo();
             animateCardIn(0);
-        }
-        function saveCheckboxAnswer(index) {
-            const card = document.getElementById(`q-card-${index}`);
-            formAnswers[SURVEY_CONFIG.questions[index].id] = [...card.querySelectorAll('input[type="checkbox"]:checked')].map(el=>el.value);
         }
 
         function saveAnswer(stepIndex, value) {
@@ -950,17 +947,9 @@
                     canvas.style.display='none'; ctx.clearRect(0,0,w,h);
                     if(epic) { epic.style.display='none'; epic.style.visibility=''; }
                     const screen=document.getElementById('success-screen');
-                    sendData().then(result => {
-                        document.getElementById('success-title').textContent = 'Yanıt gönderildi';
-                        document.getElementById('success-message').textContent = result.message || 'Yanıtınız Google Forms’a kaydedildi.';
-                    }).catch(err => {
-                        document.getElementById('success-title').textContent = 'Gönderilemedi';
-                        document.getElementById('success-message').textContent = err.message || 'Yanıt Google Forms’a gönderilemedi.';
-                    }).finally(() => {
-                        screen.style.pointerEvents='auto';
-                        gsap.fromTo(screen,{opacity:0},{opacity:1,duration:.75,ease:'power2.out'});
-                        gsap.fromTo('.success-card',{scale:.97,y:8,filter:'blur(5px)'},{scale:1,y:0,filter:'blur(0px)',duration:.8,ease:'power3.out',clearProps:'transform,filter'});
-                    });
+                    screen.style.pointerEvents='auto';
+                    gsap.fromTo(screen,{opacity:0},{opacity:1,duration:.75,ease:'power2.out'});
+                    gsap.fromTo('.success-card',{scale:.97,y:8,filter:'blur(5px)'},{scale:1,y:0,filter:'blur(0px)',duration:.8,ease:'power3.out',clearProps:'transform,filter'});
                 }
             }
             // İlk karede metin maskesinin zerreleri çizilir; DOM yazısı aynı paint öncesinde
@@ -970,36 +959,10 @@
         }
 
         function sendData() {
-            return new Promise((resolve, reject) => {
-                if (!window.google || !google.script || !google.script.run) { reject(new Error('Bu sayfa Apps Script web uygulaması olarak yayımlanmamış.')); return; }
-                google.script.run.withSuccessHandler(resolve).withFailureHandler(err=>reject(new Error(err.message || 'Gönderim başarısız.'))).submitSurvey(SURVEY_CONFIG.token, formAnswers, document.getElementById('respondent-email')?.value || '');
-            });
+            const formData = new FormData();
+            for (const key in formAnswers) formData.append(key, formAnswers[key]);
+            fetch(SURVEY_CONFIG.formUrl, { method: 'POST', mode: 'no-cors', body: formData }).catch(e => console.log(e));
         }
-
-        document.getElementById('create-url-btn').addEventListener('click', () => {
-            const field = document.getElementById('google-form-url');
-            const status = document.getElementById('setup-status');
-            const wrap = document.getElementById('generated-url-wrap');
-            let parsed; try { parsed = new URL(field.value.trim()); } catch (_) { parsed = null; }
-            if (!parsed || parsed.protocol !== 'https:' || parsed.hostname !== 'docs.google.com' || !parsed.pathname.includes('/forms/')) { status.textContent = 'Geçerli bir https://docs.google.com/forms/... bağlantısı gir.'; wrap.classList.add('hidden'); return; }
-            if (!window.google || !google.script || !google.script.run) { status.textContent = 'Gerçek senkronizasyon için bu HTML, Apps Script web uygulaması olarak yayımlanmalı. GitHub Pages tek başına yeterli değil.'; return; }
-            status.textContent = 'Form doğrulanıyor ve bağlantı hazırlanıyor…';
-            google.script.run.withSuccessHandler(result => { document.getElementById('generated-url').textContent = result.url; wrap.classList.remove('hidden'); status.textContent = result.message; }).withFailureHandler(err => { status.textContent = err.message || 'Form okunamadı. Form erişimini ve bağlantıyı kontrol et.'; }).createSurveyLink(parsed.href);
-        });
-        document.getElementById('copy-url-btn').addEventListener('click', async () => {
-            const value = document.getElementById('generated-url').textContent;
-            try {
-                await navigator.clipboard.writeText(value);
-                document.getElementById('setup-status').textContent = 'Bağlantı panoya kopyalandı.';
-            } catch (_) {
-                document.getElementById('setup-status').textContent = 'Otomatik kopyalama desteklenmedi. Bağlantıyı seçip elle kopyalayabilirsin.';
-            }
-        });
-        document.getElementById('preview-url-btn').addEventListener('click', () => {
-            const value = document.getElementById('generated-url').textContent;
-            if (value) window.location.href = value;
-        });
-
 
         /** =========================================
          *  5. THREE.JS MOTORU (Yıldızlar + Gerçek 3D Uzay)
@@ -1250,17 +1213,8 @@
         }
 
         window.onload = () => {
+            buildForm();
             animate();
-            if (sharedToken) {
-                if (!window.google || !google.script || !google.script.run) {
-                    document.getElementById('setup-status').textContent = 'Bu bağlantı Apps Script web uygulaması içinde açılmalıdır.';
-                    return;
-                }
-                google.script.run.withSuccessHandler(data => {
-                    if (data.closed) { document.getElementById('success-title').textContent='Anket kapatıldı'; document.getElementById('success-message').textContent='Google Forms sahibi yanıt kabulünü kapatmış veya anketi silmiş.'; document.getElementById('success-screen').style.pointerEvents='auto'; document.getElementById('success-screen').style.opacity='1'; return; }
-                    SURVEY_CONFIG.questions = data.questions; SURVEY_CONFIG.formUrl = data.formUrl; buildForm();
-                }).withFailureHandler(err => { document.getElementById('success-title').textContent='Anket açılamadı'; document.getElementById('success-message').textContent=err.message || 'Bağlantı geçersiz veya form erişilemiyor.'; document.getElementById('success-screen').style.pointerEvents='auto'; document.getElementById('success-screen').style.opacity='1'; }).loadSurvey(sharedToken);
-            }
         };
     </script>
 </body>
